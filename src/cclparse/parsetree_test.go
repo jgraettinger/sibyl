@@ -1,41 +1,87 @@
 package cclparse
 
 import (
-    "testing"
+	"testing"
 )
 
+func TestAddArgument(t *testing.T) {
+	chart := NewChart()
 
-func TestExtractConstituentParse(t * testing.T) {
-    chart := NewChart([]string{"I", "know", "the", "boy", "sleeps"})
+	C_here := chart.AddCell("here")
+	C_it := chart.AddCell("it")
+	C_goes := chart.AddCell("goes")
 
-    chart.AddLink(1, 0, 1) // know =1> I
-    chart.AddLink(1, 2, 0) // know =0> the
-    chart.AddLink(2, 3, 0) // the =0> boy
-    chart.AddLink(3, 2, 0) // boy =0> the
-    chart.AddLink(1, 4, 0) // know =0> sleeps
-    chart.AddLink(4, 3, 1) // sleeps =1> boy
+	baseline := NewParseNode(C_goes,
+		).AddLabelArgument("l1", NewParseNode(C_it),
+		).AddLabelArgument("l2", NewParseNode(C_here))
 
-    t.Log(chart)
+	compare := NewParseNode(C_goes,
+		).AddLabelArgument("l2", NewParseNode(C_here),
+		).AddLabelArgument("l1", NewParseNode(C_it))
 
-    heights := ExtractSyntacticParse(chart)
+	if !baseline.Equals(compare) {
+		t.Error("Invariant to argument declaration order")
+	}
 
-    t.Log(heights)
+	compare = NewParseNode(C_goes,
+		).AddLabelArgument("err", NewParseNode(C_it),
+		).AddLabelArgument("l2", NewParseNode(C_here))
 
+	if baseline.Equals(compare) {
+		t.Error("Label mismatch")
+	}
 }
 
-/*
-    chart := NewChart([]string{"I", "heard", "a", "man", "rode", "the", "subway", "on", "friday"})
+func TestBuildDirectedParse(t *testing.T) {
 
-    chart.AddLink(1, 0, 1) // heard =1> I
-    chart.AddLink(1, 2, 0) // heard =0> a
-    chart.AddLink(2, 3, 0) // a =0> man
-    chart.AddLink(3, 2, 0) // man =0> a
-    chart.AddLink(1, 4, 0) // heard =0> rode
-    chart.AddLink(4, 3, 1) // rode =1> man
-    chart.AddLink(4, 5, 0) // rode =0> the
-    chart.AddLink(5, 6, 0) // the =0> subway
-    chart.AddLink(6, 5, 0) // subway =0> the
-    chart.AddLink(6, 7, 0) // subway =0> on
-    chart.AddLink(7, 8, 0) // on =0> friday
-    chart.AddLink(8, 7, 0) // friday =0> on
-*/
+	// simple case 
+	{
+		chart := NewChart()
+
+		C_the := chart.AddCell("the")
+		C_boy := chart.AddCell("boy")
+
+		/*D_the_boy :=*/ chart.AddLink(0, 1, 0)
+		/*D_boy_the :=*/ chart.AddLink(1, 0, 0)
+
+		expected := NewParseNode(C_the, C_boy)
+		parse := chart.BuildDirectedParse()
+
+		if !parse.Equals(expected) {
+			t.Error(parse, expected)
+		}
+	}
+
+	// complex case
+	{
+		chart := NewChart()
+
+		C_I := chart.AddCell("I")
+		C_know := chart.AddCell("know")
+		C_the := chart.AddCell("the")
+		C_boy := chart.AddCell("boy")
+		C_sleeps := chart.AddCell("sleeps")
+
+		D1_know_I := chart.AddLink(1, 0, 1)
+		D0_know_the := chart.AddLink(1, 2, 0)
+		/*D0_the_boy :=*/ chart.AddLink(2, 3, 0)
+		/*D0_boy_the :=*/ chart.AddLink(3, 2, 0)
+		D0_know_sleeps := chart.AddLink(1, 4, 0)
+		D1_sleeps_boy := chart.AddLink(4, 3, 1)
+
+		PN_the_boy := NewParseNode(C_the, C_boy)
+
+		expected := NewParseNode(C_know,
+			).AddLinkArgument(D1_know_I, NewParseNode(C_I),
+			).AddLinkArgument(D0_know_the, PN_the_boy,
+			).AddLinkArgument(D0_know_sleeps, NewParseNode(C_sleeps,
+				).AddLinkArgument(D1_sleeps_boy, PN_the_boy))
+
+		head := chart.BuildDirectedParse()
+
+		if !head.Equals(expected) {
+			t.Error(head, expected)
+		}
+	}
+}
+

@@ -20,22 +20,24 @@ type CoverLink struct {
 
 type Chart []*Cell
 
-func NewChart(tokens []string) Chart {
-
-    chart := Chart{}
-    for ind, token := range(tokens) {
-
-        cell := &Cell{(uint)(ind), token, []*CoverLink{}, []*CoverLink{}}
-        chart = append(chart, cell)
-    }
-    return chart
+func NewChart() (chart *Chart) {
+    chart = &Chart{}
+    return
 }
 
-func (c Chart) AddLink(from, to, depth uint) {
-    link := &CoverLink{c[from], c[to], depth}
+func (chart *Chart) AddCell(token string) (cell *Cell) {
+
+    cell = &Cell{(uint)(len(*chart)), token, []*CoverLink{}, []*CoverLink{}}
+    *chart = append(*chart, cell)
+    return cell
+}
+
+func (c Chart) AddLink(from, to, depth uint) (link *CoverLink) {
+    link = &CoverLink{c[from], c[to], depth}
 
     c[from].Outbound = append(c[from].Outbound, link)
     c[to].Inbound = append(c[to].Inbound, link)
+    return
 }
 
 func (c *Cell) String() string {
