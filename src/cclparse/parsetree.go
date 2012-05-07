@@ -6,48 +6,55 @@ import (
 	"strings"
 )
 
-type ParseNode struct {
-	covered []*Cell
-	arguments []ParseNodeArgument
+type ParseLink struct {
+	label string
+	coverLink *CoverLink
 }
 
-type ParseNodeArgument struct {
-	label string
+type ParseLinks map[*ParseNode] ParseLink
+
+type ParseLinksEntry struct {
 	child *ParseNode
+	link ParseLink
+}
+
+type ParseLinksEntries []ParseLinksEntry
+
+type ParseNode struct {
+	covered []*Cell
+	arguments ParseLinks
+}
+
+func (l ParseLinksEntries) Len() int { return len(l) }
+func (l ParseLinksEntries) Swap(i, j int) {	l[i], l[j] = l[j], l[i] }
+
+func (l ParseLinksEntries) Less(i, j int) bool {
+	// order on head's beginning token index
+	return l[i].child.covered[0].Index < l[j].child.covered[0].Index
 }
 
 func NewParseNode(covered ...*Cell) (node *ParseNode) {
-	{
-		var last *Cell
-		for _, cell := range(covered) {
-			invariant(last == nil || last.Index + 1 == cell.Index,
-				"covered cells aren't contiguous: %v", covered)
-		}
+	var last *Cell
+	for _, cell := range(covered) {
+		invariant(last == nil || last.Index + 1 == cell.Index,
+			"covered cells aren't contiguous: %v", covered)
 	}
-	node = &ParseNode{covered, []ParseNodeArgument{}}
+	node = &ParseNode{covered, make(ParseLinks)}
 	return
 }
 
 func (node *ParseNode) AddLinkArgument(
 	link *CoverLink, child *ParseNode) *ParseNode {
 
-	node.AddLabelArgument(fmt.Sprintf("d=%d", link.Depth), child)
+	node.arguments[child] = ParseLink{
+		fmt.Sprintf("d=%d", link.Depth), link}
 	return node
 }
 
 func (node *ParseNode) AddLabelArgument(
 	label string, child *ParseNode) *ParseNode {
 
-	// small number of arguments; binary search may be overkill
-	ind := sort.Search(len(node.arguments),	func (i int) bool {
-			return child.covered[0].Index <
-				node.arguments[i].child.covered[0].Index
-		})
-
-	node.arguments = append(node.arguments[:ind],
-		append([]ParseNodeArgument{ParseNodeArgument{label, child}},
-			node.arguments[ind:]...)...)
-
+	node.arguments[child] = ParseLink{label, nil}
 	return node
 }
 
@@ -59,30 +66,15 @@ func (node *ParseNode) Head() string {
 	return strings.Join(tokens, " ")
 }
 
-func (node *ParseNode) Equals(other *ParseNode) bool {
-	if other == nil {
-		return false
-	} else if len(node.covered) != len(other.covered) {
-		return false
-	} else if len(node.arguments) != len(other.arguments) {
-		return false
-	}
+func (node *ParseNode) OrderedArguments() ParseLinksEntries {
 
-	for ind := range(node.covered) {
-		if node.covered[ind] != other.covered[ind] {
-			return false
-		}
+	entries := make(ParseLinksEntries, 0, len(node.arguments))
+
+	for child, link := range(node.arguments) {
+		entries = append(entries, ParseLinksEntry{child, link})
 	}
-	for ind := range(node.arguments) {
-		if node.arguments[ind].label != other.arguments[ind].label {
-			return false
-		}
-		if !node.arguments[ind].child.Equals(
-			other.arguments[ind].child) {
-			return false
-		}
-	}
-	return true
+	sort.Sort(entries)
+	return entries
 }
 
 func (node *ParseNode) AsText(indent int, label string) []string {
@@ -91,107 +83,52 @@ func (node *ParseNode) AsText(indent int, label string) []string {
 		strings.Repeat(" ", indent),
 		fmt.Sprintf("<%v>(\"%v\"", label, node.Head())}
 
-	for _, arg := range(node.arguments) {
+	for _, entry := range(node.OrderedArguments()) {
 
 		parts = append(parts, ",\n")
-		parts = append(parts, arg.child.AsText(indent + 1, arg.label)...)
+		parts = append(parts, entry.child.AsText(
+			indent + 1, entry.link.label)...)
 	}
 	parts = append(parts, ")")
 	return parts
 }
 
+func (head *ParseNode) AsGraphviz() string {
+
+	parts := []string{"digraph {"}
+
+	// interns parse nodes to a unique label for graphviz output
+	gvIds := make(map[*ParseNode]string)
+	gvId := func(n *ParseNode) string {
+		if l, ok := gvIds[n]; ok {
+			return l
+		}
+		gvIds[n] = fmt.Sprintf("%v%d%d", strings.Replace(n.Head(), " ", "_", -1), n.covered[0].Index, len(gvIds),
+			)
+		return gvIds[n]
+	}
+
+	// recursively emits labeled nodes & edges in graphviz output
+	var emit func (*ParseNode)
+	emit = func(n *ParseNode) {
+
+		parts = append(parts, fmt.Sprintf("  %v [label=\"%v\"];",
+			gvId(n), n.Head()))
+
+		for child, link := range(n.arguments) {
+			parts = append(parts, fmt.Sprintf("  %v -> %v [label=\"%v\"];",
+				gvId(n), gvId(child), link.label))
+
+			emit(child)
+		}
+	}
+	emit(head)
+
+	parts = append(parts, "}")
+	return strings.Join(parts, "\n")
+}
+
 func (node *ParseNode) String() string {
 	return strings.Join(node.AsText(0, ""), "")
-}
-
-
-func (chart Chart) BuildDirectedParse() *ParseNode {
-
-	// step one: create parse nodes, collapsing spans of adjacent
-	//  directed cycles into a shared ParseNode
-	covering := make([]*ParseNode, len(chart))
-
-	collapse := false
-	for _, cell := range(chart) {
-
-		if collapse {
-			// expand previous cell's cover node to this cell
-			node := covering[cell.Index - 1]
-			covering[cell.Index] = node
-			node.covered = append(node.covered, cell)
-		} else {
-			// invent a new ParseNode to cover this cell
-			covering[cell.Index] = NewParseNode(cell)
-		}
-
-		var forwardLink, backLink *CoverLink
-
-		for _, link := range(cell.Outbound) {
-			if link.To.Index == cell.Index + 1 {
-				forwardLink = link
-			}
-		}
-		for _, link := range(cell.Inbound) {
-			if link.From.Index == cell.Index + 1 {
-				backLink = link
-			}
-		}
-
-		if forwardLink != nil && backLink != nil {
-			// this cell forms a cycle with the previous cell;
-			//  collapse into a shared ParseNode
-
-			invariant(forwardLink.Depth == 0 && backLink.Depth == 0,
-				"Bad cycle %v <-> %v", forwardLink, backLink);
-
-			collapse = true
-		} else {
-			collapse = false
-		}
-	}
-
-	// step 2: build ParseNodeArgument links derived from CoverLinks;
-	//  also track which ParseNodes are reachable for head detection
-	heads := make(map[*ParseNode] bool)
-
-	for _, node := range(covering) {
-		heads[node] = true
-	}
-
-	for _, cell := range(chart) {
-
-		node := covering[cell.Index]
-		for _, link := range(cell.Outbound) {
-
-			child := covering[link.To.Index]
-			if node == child {
-				// skip self-referential links
-				continue
-			}
-
-			node.AddLinkArgument(link, child)
-			delete(heads, child)
-		}
-	}
-
-	invariant(len(heads) == 1, "Multiple heads detected: %v", heads)
-	for head := range(heads) {
-		return head
-	}
-	// not reached
-	return nil
-}
-
-func invariant(check bool, a ...interface{}) {
-	if check {
-		return
-	}
-	if len(a) != 0 {
-		errf := a[0].(string)
-
-		panic(fmt.Sprintf(errf, a[1:]...))
-	} else {
-		panic("Invariant check failed")
-	}
 }
 
