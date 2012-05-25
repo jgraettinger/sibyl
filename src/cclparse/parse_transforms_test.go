@@ -25,7 +25,6 @@ func buildFixture() (chart *Chart, C map[string]*Cell, L map[string]*CoverLink) 
 	return
 }
 
-
 func TestBuildDirectedParse(t *testing.T) {
 
 	// single-bracket NP fragment case
