@@ -4,11 +4,10 @@ import (
     "io"
     "os"
     "encoding/json"
+    "invariant"
 )
 
-type LabelType uint8
-
-type AdjacencyPointKey struct {
+type AdjacencyPoint struct {
     Token string
     Position int
 }
@@ -16,8 +15,8 @@ type LabelWeight struct {
     ClassWeight float32
     AdjacencyWeight float32
 }
-type AdjacencyPoint struct {
-    AdjacencyPointKey
+type AdjacencyStatistics struct {
+    AdjacencyPoint
 
     UpdateCount uint64
     Stop uint64
@@ -29,13 +28,13 @@ type AdjacencyPoint struct {
     Labels map[string]LabelWeight
 }
 
-type AdjacencyPoints map[*AdjacencyPointKey]*AdjacencyPoint
+type Lexicon map[*AdjacencyPoint]*AdjacencyStatistics
 
 func NewLexiconFromJson(input io.ReadCloser) (
-        lexicon AdjacencyPoints, err error) {
+        lexicon Lexicon, err error) {
 
     var file io.ReadCloser
-    lexicon = make(AdjacencyPoints)
+    lexicon = make(Lexicon)
 
     if file, err = os.Open(path); err != nil {
         return
@@ -44,16 +43,33 @@ func NewLexiconFromJson(input io.ReadCloser) (
 
     decoder := json.NewDecoder(file)
     for {
-        var adjPoint AdjacencyPoint
+        var adjStats AdjacencyStatistics
 
-        if err = decoder.Decode(&adjPoint); err == io.EOF {
+        if err = decoder.Decode(&adjStats); err == io.EOF {
             break
         } else if err != nil {
             return
         }
-        lexicon[&adjPoint.AdjacencyPointKey] = &adjPoint
+        lexicon[&adjStats.AdjacencyPoint] = &adjStats
     }
     err = nil
     return
 }
 
+func linkWeight(out, in *AdjacencyStatistics) float32 {
+
+    invariant.NotNil(out)
+
+    var bestLabel string
+    var bestIsClass bool
+
+    for token, weights := range(out.Labels) {
+
+        
+
+
+    }
+
+
+
+}
