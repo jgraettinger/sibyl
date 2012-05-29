@@ -8,6 +8,7 @@ type Cell struct {
     Index uint
     Token string
 
+    // at most one inbound link on each side
     Inbound  []*CoverLink
     Outbound []*CoverLink
 }

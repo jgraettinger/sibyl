@@ -1,5 +1,9 @@
 package cclparse
 
+import (
+    "invariant"
+)
+
 func (chart Chart) BuildDirectedParse() *ParseNode {
 
 	// step one: create parse nodes, collapsing spans of adjacent
@@ -33,11 +37,11 @@ func (chart Chart) BuildDirectedParse() *ParseNode {
 		}
 
 		if forwardLink != nil && backLink != nil {
-			// this cell forms a cycle with the previous cell;
+			// this cell forms a cycle with the previous cell
 			//  collapse into a shared ParseNode
 
-			invariant(forwardLink.Depth == 0 && backLink.Depth == 0,
-				"Bad cycle %v <-> %v", forwardLink, backLink);
+			invariant.IsTrue(forwardLink.Depth == 0 && backLink.Depth == 0,
+				"Bad cycle %v <-> %v", forwardLink, backLink)
 
 			collapse = true
 		} else {
@@ -69,7 +73,9 @@ func (chart Chart) BuildDirectedParse() *ParseNode {
 		}
 	}
 
-	invariant(len(heads) == 1, "Multiple heads detected: %v", heads)
+	invariant.Equal(len(heads), 1,
+	    "Multiple heads detected: %v", heads)
+
 	for head := range(heads) {
 		return head
 	}

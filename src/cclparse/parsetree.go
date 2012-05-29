@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"invariant"
 )
 
 type ParseLink struct {
@@ -36,7 +37,7 @@ func (l ParseLinksEntries) Less(i, j int) bool {
 func NewParseNode(covered ...*Cell) (node *ParseNode) {
 	var last *Cell
 	for _, cell := range(covered) {
-		invariant(last == nil || last.Index + 1 == cell.Index,
+		invariant.IsTrue(last == nil || last.Index + 1 == cell.Index,
 			"covered cells aren't contiguous: %v", covered)
 	}
 	node = &ParseNode{covered, make(ParseLinks)}

@@ -1,19 +1,16 @@
 package cclparse
 
 import (
-	"fmt"
+	//"fmt"
 )
 
-func invariant(check bool, a ...interface{}) {
-	if check {
-		return
-	}
-	if len(a) != 0 {
-		errf := a[0].(string)
+func fmin(a, b float64) float64 {
+	if a < b { return a }
+	return b
+}
 
-		panic(fmt.Sprintf(errf, a[1:]...))
-	} else {
-		panic("Invariant check failed")
-	}
+func fabs(a float64) float64 {
+	if a < 0 { return -a }
+	return a
 }
 

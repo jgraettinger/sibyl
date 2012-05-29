@@ -1,75 +1,64 @@
 package cclparse
 
 import (
-    "io"
-    "os"
-    "encoding/json"
     "invariant"
 )
 
-type AdjacencyPoint struct {
-    Token string
-    Position int
+type Lexicon map[AdjacencyPoint]*AdjacencyStatistics
+
+func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics,
+    ) (linkWeight float64, linkDepth uint8) {
+
+    invariant.NotNil(xOut)
+    invariant.NotNil(yIn)
+
+	label, labelWeight := bestMatchingLabel(xOut, yIn)
+	if labelWeight == 0 {
+		return
+	}
+
+	// use the best matching label to determine the 'prototype'
+	//  statistics to use in calculating link weight;
+	// prototypes tend to be frequent words, and conceptually
+	//  describe the relationship between x & y
+	var prototype *AdjacencyStatistics
+	if label.IsClass() {
+		// label prototypes x along with tokens separating x from y
+		prototype = lexicon[AdjacencyPoint{label.Token, xOut.Sign()}]
+	} else {
+		// label prototypes y in it's relationship with x
+		prototype = lexicon[AdjacencyPoint{label.Token, -xOut.Sign()}]
+	}
+
+	if prototype == nil {
+		return
+	}
+
+	if label.IsClass() && prototype.Out > 0 {
+		linkWeight = fmin(labelWeight, prototype.OutNorm())
+		return
+	}
+
+	if label.IsAdjacency() {
+		if prototype.In > 0 {
+			linkWeight = fmin(labelWeight, prototype.InNorm())
+		} else if prototype.InRaw > fabs(prototype.In) {
+			linkWeight = fmin(labelWeight, prototype.InRawNorm())
+		}
+
+		if linkWeight != 0 {
+			if prototype.InRaw < 0 && prototype.Out <= 0 {
+				linkDepth = 1
+			}
+			return
+		}
+	}
+
+	if prototype.Out <= 0 && prototype.In <= 0 && (
+			label.IsAdjacency() || prototype.Out == 0) {
+		linkWeight = labelWeight
+		return
+	}
+	return
 }
-type LabelWeight struct {
-    ClassWeight float32
-    AdjacencyWeight float32
-}
-type AdjacencyStatistics struct {
-    AdjacencyPoint
 
-    UpdateCount uint64
-    Stop uint64
-
-    InRaw float32
-    Out float32
-    In float32
-
-    Labels map[string]LabelWeight
-}
-
-type Lexicon map[*AdjacencyPoint]*AdjacencyStatistics
-
-func NewLexiconFromJson(input io.ReadCloser) (
-        lexicon Lexicon, err error) {
-
-    var file io.ReadCloser
-    lexicon = make(Lexicon)
-
-    if file, err = os.Open(path); err != nil {
-        return
-    }
-    defer file.Close()
-
-    decoder := json.NewDecoder(file)
-    for {
-        var adjStats AdjacencyStatistics
-
-        if err = decoder.Decode(&adjStats); err == io.EOF {
-            break
-        } else if err != nil {
-            return
-        }
-        lexicon[&adjStats.AdjacencyPoint] = &adjStats
-    }
-    err = nil
-    return
-}
-
-func linkWeight(out, in *AdjacencyStatistics) float32 {
-
-    invariant.NotNil(out)
-
-    var bestLabel string
-    var bestIsClass bool
-
-    for token, weights := range(out.Labels) {
-
-        
-
-
-    }
-
-
-
-}
