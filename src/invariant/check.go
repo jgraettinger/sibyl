@@ -48,5 +48,4 @@ func IsTrue(result bool, args ...interface{}) {
             "Invariant Violation:\n\t<At %v:%v>", file, line)
         panic(errorString)
     }
-
 }

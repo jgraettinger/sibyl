@@ -1,5 +1,5 @@
 package cclparse
-
+/*
 import (
     "invariant"
 )
@@ -159,4 +159,4 @@ func (chart Chart) BuildConstituentParse() *ParseNode {
 	head = hoist(head)
 	return head
 }
-
+*/

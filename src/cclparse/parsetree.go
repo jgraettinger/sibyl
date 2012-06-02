@@ -1,5 +1,5 @@
 package cclparse
-
+/*
 import (
 	"fmt"
 	"sort"
@@ -132,4 +132,4 @@ func (head *ParseNode) AsGraphviz() string {
 func (node *ParseNode) String() string {
 	return strings.Join(node.AsText(0, ""), "")
 }
-
+*/
