@@ -22,12 +22,11 @@ type AdjacencyStatistics struct {
     LabelWeights map[Label]float64
 }
 
-func NewAdjacencyStatistics(token string, position int) (
+func NewAdjacencyStatistics(point AdjacencyPoint) (
 		this *AdjacencyStatistics) {
 
 	this = new(AdjacencyStatistics)
-	this.Token = token
-	this.Position = position
+	this.AdjacencyPoint = point
 	this.LabelWeights = make(map[Label]float64)
 	return
 }

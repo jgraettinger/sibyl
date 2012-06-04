@@ -10,16 +10,24 @@ type Cell struct {
 	Index uint
 	Token string
 
+	Outbound struct{Left, Right AdjacencyList}
 	Inbound  struct{Left, Right AdjacencySet}
-	Outbound struct{Left, Right AdjacencySet}
 }
 
-type Chart []*Cell
+type Chart struct {
+	cells []*Cell
+	endInbound AdjacencySet
+}
+
+func NewChart() (chart *Chart) {
+    chart = new(Chart)
+    chart.endInbound = make(AdjacencySet)
+}
 
 type Adjacency struct {
 
 	From *Cell // inclusive
-	To   *Cell // inclusive
+	To   *Cell // inclusive; may be nil
 
 	// the potential argument attachment
 	//  position this adjacency reflects
@@ -33,6 +41,7 @@ type Adjacency struct {
 }
 
 type AdjacencySet map[*Adjacency]bool
+type AdjacencyList []*Adjacency
 
 func (set AdjacencySet) Add(adjacency *Adjacency) {
 	set[adjacency] = true
@@ -44,19 +53,10 @@ func (set AdjacencySet) Remove(adjacency *Adjacency) {
 	delete(set, adjacency)
 }
 
-func NewChart() (chart *Chart) {
-	return new(Chart)
+func (list *AdjacencyList) Add(adjacency *Adjacency) {
+    list = append(list, adjacency)
+    invariant.IsEqual(len(*list), iabs(adjacency.Position))
 }
-
-func (c *Cell) String() string {
-	return fmt.Sprintf("Cell<%d, %s, %v, %v>",
-		c.Index, c.Token, c.Inbound, c.Outbound)
-}
-
-/*func (l *CoverLink) String() string {
-	return fmt.Sprintf("CoverLink<%s (%d), %s (%d), %d>",
-		l.From.Token, l.From.Index, l.To.Token, l.To.Index, l.Depth)
-}*/
 
 func (chart *Chart) AddCell(token string) {
 
@@ -67,31 +67,22 @@ func (chart *Chart) AddCell(token string) {
 	}
 
 	nextCell = new(Cell)
-	nextCell.Index = (uint)(len(*chart))
+	nextCell.Index = (uint)(len(chart.cells))
 	nextCell.Token = token
 	nextCell.Inbound.Left = make(AdjacencySet)
 	nextCell.Inbound.Right = make(AdjacencySet)
-	nextCell.Outbound.Left = make(AdjacencySet)
-	nextCell.Outbound.Right = make(AdjacencySet)
-	*chart = append(*chart, nextCell)
+	chart.cells = append(chart.cells, nextCell)
 
-	if prevCell == nil {
-		return
-	}
+    // update all adjacencies to {end}, to be adjacent to nextCell
+    for adjacency := range(chart.endInbound) {
+        delete(chart.endInbound, adjacency)
 
-	// initialize direct left-to-right adjacency
-	{
-		adjacency := new(Adjacency)
-		adjacency.From = prevCell
-		adjacency.To = nextCell
-		adjacency.Position = 1
+        adjacency.To = nextCell
+        nextCell.Inbound.Left.Add(adjacency)
+    }
 
-		prevCell.Outbound.Right.Add(adjacency)
-		nextCell.Inbound.Left.Add(adjacency)
-	}
-
-	// initialize direct right-to-left adjacency
-	{
+    // add nextCell => prevCell adjacency 
+    {
 		adjacency := new(Adjacency)
 		adjacency.From = nextCell
 		adjacency.To = prevCell
@@ -101,30 +92,15 @@ func (chart *Chart) AddCell(token string) {
 		prevCell.Inbound.Right.Add(adjacency)
 	}
 
-	// for all *used* adjacencies ending at prevCell,
-	//  create a new adjacency with position + 1
-	// (there should be no more than one such used adjacency)
-	{
-		foundUsed := false
-		for adjacency := range(prevCell.Inbound.Left) {
-			if adjacency.Used {
+    // add nextCell => {end} adjacency
+    {
+        adjacency := new(Adjacency)
+        adjacency.From = nextCell
+        adjacency.Position = 1
 
-				// we expect to see at most one used adjacency
-				//  on the left side of prevCell
-				invariant.IsTrue(!foundUsed)
-				foundUsed = true
-
-				// this adjacency is used; create a new one	with position + 1
-				newAdjacency := new(Adjacency)
-				newAdjacency.From = adjacency.From
-				newAdjacency.To = nextCell
-				newAdjacency.Position = adjacency.Position + 1
-
-				newAdjacency.From.Outbound.Right.Add(newAdjacency)
-				nextCell.Inbound.Left.Add(adjacency)
-			}
-		}
-	}
+        nextCell.Outbound.Right.Add(adjacency)
+        chart.endInbound.Add(adjacency)
+    }
 }
 
 func (chart *Chart) AsGraphviz() string {
