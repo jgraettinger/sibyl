@@ -2,6 +2,7 @@ package cclparse
 
 import (
 	//"invariant"
+    "fmt"
 )
 
 type LabelType uint8
@@ -31,3 +32,9 @@ func (label Label) IsAdjacency() bool {
 	return label.Type == ADJACENCY
 }
 
+func (label Label) String() string {
+    if label.IsClass() {
+        return fmt.Sprintf("[%#v]", label.Token)
+    }
+    return fmt.Sprintf("[_%#v]", label.Token)
+}

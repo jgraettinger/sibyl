@@ -1,13 +1,18 @@
 package cclparse
 
 import (
-    "invariant"
+	"invariant"
+	"strings"
 )
 
-type Lexicon map[AdjacencyPoint]AdjacencyStatistics
+type Lexicon map[AdjacencyPoint]*AdjacencyStatistics
+
+func NewLexicon() Lexicon {
+	return make(Lexicon)
+}
 
 func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics,
-    ) (linkWeight float64, linkDepth uint8) {
+) (linkWeight float64, linkDepth uint8) {
 
     invariant.NotNil(xOut)
     invariant.NotNil(yIn)
@@ -34,75 +39,101 @@ func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics,
 		return
 	}
 
-	if label.IsClass() && prototype.Out > 0 {
+	if label.IsClass() && prototype.out > 0 {
 		linkWeight = fmin(labelWeight, prototype.OutNorm())
 		return
 	}
 
 	if label.IsAdjacency() {
-		if prototype.In > 0 {
+		if prototype.in > 0 {
 			linkWeight = fmin(labelWeight, prototype.InNorm())
-		} else if prototype.InRaw > fabs(prototype.In) {
+		} else if float64(prototype.inRaw) > fabs(prototype.in) {
 			linkWeight = fmin(labelWeight, prototype.InRawNorm())
 		}
 
 		if linkWeight != 0 {
-			if prototype.InRaw < 0 && prototype.Out <= 0 {
+			if float64(prototype.inRaw) < 0 && prototype.out <= 0 {
 				linkDepth = 1
 			}
 			return
 		}
 	}
 
-	if prototype.Out <= 0 && prototype.In <= 0 && (
-			label.IsAdjacency() || prototype.Out == 0) {
+	if prototype.out <= 0 && prototype.in <= 0 && (label.IsAdjacency() || prototype.out == 0) {
 		linkWeight = labelWeight
 		return
 	}
 	return
 }
 
-func (lexicon Lexicon) Update(adj *Adjacency) {
+func (lexicon Lexicon) Score(adjacency *Adjacency
+    ) (linkWeight float64, linkDepth uint8) {
 
-    var fromStats, toStats *AdjacencyStatistics
-
-    fromStats = lexicon.Intern(AdjacencyPoint{adj.From.Token, adj.Position})
-
-    stats.Count++
-
-    if adj.To == nil { // || adj.To.IsPunctuation
-        // track that this adjacency is unusable
-        stats.Stop++
+    if adjacency.To == nil {
+        // empty adjacency
         return
     }
 
-    // increment direct adjacency label count
-    stats.LabelWeights[Label{ADJACENCY, adjacency.To.Token}] += 1
-
-    sameSign := lexicon[AdjacencyPoint{adj.From.Token
-    for label, weight := range(
-        lexicon[AdjacencyPoint{adj.To.Token, -from.Sign()}) {
-
-        // Add activation
-
+    yIn := lexicon[AdjacencyPoint{adjacency.To.Token,
+        -isign(adjacency.Position)}]
+    if yIn == nil {
+        return
     }
 
-    to := AdjacencyPoint{adjacency.To.Token, -from.Sign()}
+    // check each adjacency point of From, starting at the adjacency
+    //  position and working backwards to position 1
+    position := adjacency.Position
+    for ; linkWeight == 0 && position != 0; position - isign(position) {
 
-
-}
-
-func (lexicon Lexicon) Learn(chart Chart) {
-
-    for _, cell := range(chart) {
-
-        if cell.Index == 0 {
-            // blocked adjacency to start-of-sentence
-
+        xOut := lexicon[AdjacencyPoint{adjacency.From.Token, position}]
+        if xOut == nil {
+            continue
         }
-
+        linkWeight, linkDepth = linkWeight(xOut, yIn)
     }
-
-
+    return
 }
 
+func (this Lexicon) Learn(chart *Chart) {
+
+    var deltas []*AdjacencyStatistics
+
+	update := func(adjacency *Adjacency) {
+
+		point := AdjacencyPoint{adjacency.From.Token, adjacency.Position}
+        delta := NewAdjacencyStatistics(point)
+
+		if adjacency.To == nil {
+			delta.updateFromBlocking()
+		} else {
+			delta.update(this, adjacency.To.Token)
+		}
+
+        deltas = append(deltas, delta)
+	}
+
+	for _, cell := range chart.cells {
+		for _, adjacency := range cell.Outbound.Left {
+			update(adjacency)
+		}
+		for _, adjacency := range cell.Outbound.Right {
+			update(adjacency)
+		}
+	}
+
+    for _, delta := range deltas {
+        if stats, found := this[delta.AdjacencyPoint]; !found {
+            this[delta.AdjacencyPoint] = delta
+        } else {
+            stats.fold(delta)
+        }
+    }
+}
+
+func (this Lexicon) String() string {
+	var parts []string
+	for _, adjacency := range this {
+		parts = append(parts, adjacency.String())
+	}
+	return strings.Join(parts, "\n")
+}

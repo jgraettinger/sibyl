@@ -36,17 +36,17 @@ func NewLexiconFromJson(path string) (lexicon Lexicon, err error) {
         }
 
 		adjStats := NewAdjacencyStatistics(
-			record.Token, record.Position)
+			AdjacencyPoint{record.Token, record.Position})
 
-		adjStats.Count = record.Update_count
-		adjStats.Stop = record.Stop
-		adjStats.InRaw = record.InRaw
-		adjStats.Out = record.Out
-		adjStats.In = record.In
+		adjStats.count = record.Update_count
+		adjStats.stop = record.Stop
+		adjStats.inRaw = int64(record.InRaw)
+		adjStats.out = record.Out
+		adjStats.in = record.In
 
 		for token, weights := range(record.Labels) {
-			adjStats.LabelWeights[Label{CLASS, token}] = weights.Class_Weight
-			adjStats.LabelWeights[Label{ADJACENCY, token}] =
+			adjStats.labelWeights[Label{CLASS, token}] = weights.Class_Weight
+			adjStats.labelWeights[Label{ADJACENCY, token}] =
 				weights.Adjacency_Weight
 		}
 
