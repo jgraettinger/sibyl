@@ -11,11 +11,11 @@ func NewLexicon() Lexicon {
 	return make(Lexicon)
 }
 
-func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics,
-) (linkWeight float64, linkDepth uint8) {
+func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics) (
+	linkWeight float64, linkDepth uint8) {
 
-    invariant.NotNil(xOut)
-    invariant.NotNil(yIn)
+	invariant.NotNil(xOut)
+	invariant.NotNil(yIn)
 
 	label, labelWeight := bestMatchingLabel(xOut, yIn)
 	if labelWeight == 0 {
@@ -66,42 +66,42 @@ func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics,
 	return
 }
 
-func (lexicon Lexicon) Score(adjacency *Adjacency
-    ) (linkWeight float64, linkDepth uint8) {
+func (lexicon Lexicon) Score(adjacency *Adjacency) (
+	linkWeight float64, linkDepth uint8) {
 
-    if adjacency.To == nil {
-        // empty adjacency
-        return
-    }
+	if adjacency.To == nil {
+		// empty adjacency
+		return
+	}
 
-    yIn := lexicon[AdjacencyPoint{adjacency.To.Token,
-        -isign(adjacency.Position)}]
-    if yIn == nil {
-        return
-    }
+	yIn := lexicon[AdjacencyPoint{adjacency.To.Token,
+		-isign(adjacency.Position)}]
+	if yIn == nil {
+		return
+	}
 
-    // check each adjacency point of From, starting at the adjacency
-    //  position and working backwards to position 1
-    position := adjacency.Position
-    for ; linkWeight == 0 && position != 0; position - isign(position) {
+	// check each adjacency point of From, starting at the adjacency
+	//  position and working backwards to position 1
+	position := adjacency.Position
+	for ; linkWeight == 0 && position != 0; position -= isign(position) {
 
-        xOut := lexicon[AdjacencyPoint{adjacency.From.Token, position}]
-        if xOut == nil {
-            continue
-        }
-        linkWeight, linkDepth = linkWeight(xOut, yIn)
-    }
-    return
+		xOut := lexicon[AdjacencyPoint{adjacency.From.Token, position}]
+		if xOut == nil {
+			continue
+		}
+		linkWeight, linkDepth = lexicon.linkWeight(xOut, yIn)
+	}
+	return
 }
 
 func (this Lexicon) Learn(chart *Chart) {
 
-    var deltas []*AdjacencyStatistics
+	var deltas []*AdjacencyStatistics
 
 	update := func(adjacency *Adjacency) {
 
 		point := AdjacencyPoint{adjacency.From.Token, adjacency.Position}
-        delta := NewAdjacencyStatistics(point)
+		delta := NewAdjacencyStatistics(point)
 
 		if adjacency.To == nil {
 			delta.updateFromBlocking()
@@ -109,25 +109,25 @@ func (this Lexicon) Learn(chart *Chart) {
 			delta.update(this, adjacency.To.Token)
 		}
 
-        deltas = append(deltas, delta)
+		deltas = append(deltas, delta)
 	}
 
 	for _, cell := range chart.cells {
-		for _, adjacency := range cell.Outbound.Left {
+		for _, adjacency := range cell.Outbound[LEFT] {
 			update(adjacency)
 		}
-		for _, adjacency := range cell.Outbound.Right {
+		for _, adjacency := range cell.Outbound[RIGHT] {
 			update(adjacency)
 		}
 	}
 
-    for _, delta := range deltas {
-        if stats, found := this[delta.AdjacencyPoint]; !found {
-            this[delta.AdjacencyPoint] = delta
-        } else {
-            stats.fold(delta)
-        }
-    }
+	for _, delta := range deltas {
+		if stats, found := this[delta.AdjacencyPoint]; !found {
+			this[delta.AdjacencyPoint] = delta
+		} else {
+			stats.fold(delta)
+		}
+	}
 }
 
 func (this Lexicon) String() string {

@@ -19,9 +19,11 @@ func main() {
 	chart = cclparse.NewChart()
 	for _, token := range([]string{"that", "sentence", "is", "a", "new", "example"}) {
 		chart.AddCell(token)
+
+        for chart.AddLink(lexicon) {
+        }
 	}
     lexicon.Learn(chart)
-
 
 	fmt.Println(chart.AsGraphviz())
 

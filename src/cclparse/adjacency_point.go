@@ -109,8 +109,8 @@ func (this *AdjacencyStatistics) HasLargeStop() bool {
 func bestMatchingLabel(xOut, yIn *AdjacencyStatistics) (
 	bestLabel Label, bestWeight float64) {
 
-    invariant.NotNil(xOut)
-    invariant.NotNil(yIn)
+	invariant.NotNil(xOut)
+	invariant.NotNil(yIn)
 
 	for label, weight := range xOut.labelWeights {
 		if weight <= xOut.Stop() {
@@ -121,7 +121,7 @@ func bestMatchingLabel(xOut, yIn *AdjacencyStatistics) (
 			// l = (y, 1); corresponding weight of yIn is defined to be 1
 			weight /= xOut.Count()
 		} else {
-			weight = fmin(weight / xOut.Count(),
+			weight = fmin(weight/xOut.Count(),
 				yIn.LabelWeightNorm(label.Flip()))
 		}
 
@@ -144,6 +144,22 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 	// lookup this adjacency's inverse
 	inverse := lexicon[AdjacencyPoint{token, -this.Sign()}]
 
+	if inverse != nil {
+		// for other labels of the inverse adjacency, add normalized weight
+		//  contributions to corresonding flipped labels. Very reminiscent of the
+		//  power method for finding the largest eigen-value of a sparse matrix...
+		norm := float64(inverse.count)
+		for label, weight := range inverse.labelWeights {
+			if label != directLabel {
+				this.labelWeights[label.Flip()] += weight / norm
+			}
+		}
+	}
+
+	if iabs(this.Position) != 1 {
+		return
+	}
+
 	// calculate bootstrap 'In*' statistic update
 	if inverse == nil || inverse.HasLargeStop() {
 		if inverse == nil {
@@ -151,15 +167,17 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 			return
 		}
 
-        // TODO - I think this belongs before the return
-		// a link from inverse to this is unlikely
-		this.inRaw += -1
+		// TODO HACK - I think this belongs before the return
+		//  and shouldn't be guarded by labelWeights
 
+		if len(inverse.labelWeights) != 0 {
+			// a link from inverse to this is unlikely
+			this.inRaw += -1
+		}
 	} else {
 		flippedInverse := lexicon[AdjacencyPoint{token, this.Sign()}]
 
 		if flippedInverse == nil || flippedInverse.HasLargeStop() {
-			// a link from inverse to this is possible
 			this.inRaw += 1
 		}
 	}
@@ -169,15 +187,6 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 	this.out += inverse.InRawNorm()
 	this.in += inverse.OutNorm()
 
-	// for other labels of the inverse adjacency, add normalized weight
-	//  contributions to corresonding flipped labels. Very reminiscent of the
-	//  power method for finding the largest eigen-value of a sparse matrix...
-	norm := float64(inverse.count)
-	for label, weight := range inverse.labelWeights {
-		if label != directLabel {
-			this.labelWeights[label.Flip()] += weight / norm
-		}
-	}
 }
 
 func (this *AdjacencyStatistics) fold(other *AdjacencyStatistics) {
@@ -187,12 +196,12 @@ func (this *AdjacencyStatistics) fold(other *AdjacencyStatistics) {
 	this.count += other.count
 	this.stop += other.stop
 	this.inRaw += other.inRaw
-    this.out += other.out
-    this.in += other.in
+	this.out += other.out
+	this.in += other.in
 
-    for label, weight := range other.labelWeights {
-        this.labelWeights[label] += weight
-    }
+	for label, weight := range other.labelWeights {
+		this.labelWeights[label] += weight
+	}
 }
 
 func (this *AdjacencyStatistics) updateFromBlocking() {

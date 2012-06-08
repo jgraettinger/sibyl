@@ -6,12 +6,17 @@ import (
 	"strings"
 )
 
+const (
+	LEFT  = 0
+	RIGHT = 1
+)
+
 type Cell struct {
-	Index uint
+	Index int
 	Token string
 
-	Outbound struct{ Left, Right AdjacencyList }
-	Inbound  struct{ Left, Right AdjacencySet }
+	Outbound [2]AdjacencyList
+	Inbound  [2]AdjacencySet
 }
 
 type Chart struct {
@@ -67,10 +72,10 @@ func (chart *Chart) AddCell(token string) {
 	}
 
 	nextCell = new(Cell)
-	nextCell.Index = (uint)(len(chart.cells))
+	nextCell.Index = len(chart.cells)
 	nextCell.Token = token
-	nextCell.Inbound.Left = make(AdjacencySet)
-	nextCell.Inbound.Right = make(AdjacencySet)
+	nextCell.Inbound[LEFT] = make(AdjacencySet)
+	nextCell.Inbound[RIGHT] = make(AdjacencySet)
 	chart.cells = append(chart.cells, nextCell)
 
 	// update all adjacencies to {end}, to be adjacent to nextCell
@@ -78,7 +83,7 @@ func (chart *Chart) AddCell(token string) {
 		delete(chart.endInbound, adjacency)
 
 		adjacency.To = nextCell
-		nextCell.Inbound.Left.Add(adjacency)
+		nextCell.Inbound[LEFT].Add(adjacency)
 	}
 
 	// add nextCell => prevCell adjacency 
@@ -88,9 +93,9 @@ func (chart *Chart) AddCell(token string) {
 		adjacency.To = prevCell
 		adjacency.Position = -1
 
-		nextCell.Outbound.Left.Add(adjacency)
+		nextCell.Outbound[LEFT].Add(adjacency)
 		if prevCell != nil {
-			prevCell.Inbound.Right.Add(adjacency)
+			prevCell.Inbound[RIGHT].Add(adjacency)
 		}
 	}
 
@@ -100,7 +105,7 @@ func (chart *Chart) AddCell(token string) {
 		adjacency.From = nextCell
 		adjacency.Position = 1
 
-		nextCell.Outbound.Right.Add(adjacency)
+		nextCell.Outbound[RIGHT].Add(adjacency)
 		chart.endInbound.Add(adjacency)
 	}
 }
@@ -127,26 +132,37 @@ func (chart *Chart) AsGraphviz() string {
 			label = fmt.Sprintf("%d", adjacency.Depth)
 		}
 
+        var weight int
 		if adjacency.To != nil {
 			to = fmt.Sprintf("tok_%d", adjacency.To.Index)
+            weight = len(chart.cells) - iabs(adjacency.From.Index - adjacency.To.Index)
 		} else if left {
 			to = "tok_begin"
+            weight = len(chart.cells) - (adjacency.From.Index + 1)
 		} else {
 			to = "tok_end"
+            weight = len(chart.cells) - (len(chart.cells) - adjacency.From.Index)
 		}
 
-		return fmt.Sprintf("  tok_%d -> %v [label=\"%v\",style=\"%v\"]",
-			adjacency.From.Index, to, label, style)
+        var constraint bool
+        if adjacency.Position < 0 {
+            constraint = false
+        } else {
+            constraint = true
+        }
+
+		return fmt.Sprintf("  tok_%d -> %v [label=\"%v\",style=\"%v\",constraint=%v,weight=%v]",
+			adjacency.From.Index, to, label, style, constraint, weight)
 	}
 
 	for index, cell := range chart.cells {
 		parts = append(parts, fmt.Sprintf("  tok_%d [label=\"%v\",shape=\"box\"];",
 			index, cell.Token))
 
-		for _, adj := range cell.Outbound.Left {
+		for _, adj := range cell.Outbound[LEFT] {
 			parts = append(parts, renderAdjacency(adj, true))
 		}
-		for _, adj := range cell.Outbound.Right {
+		for _, adj := range cell.Outbound[RIGHT] {
 			parts = append(parts, renderAdjacency(adj, false))
 		}
 	}
