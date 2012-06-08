@@ -103,7 +103,7 @@ func (this Lexicon) Learn(chart *Chart) {
 		point := AdjacencyPoint{adjacency.From.Token, adjacency.Position}
 		delta := NewAdjacencyStatistics(point)
 
-		if adjacency.To == nil {
+		if adjacency.To == nil || adjacency.StoppingPunc {
 			delta.updateFromBlocking()
 		} else {
 			delta.update(this, adjacency.To.Token)

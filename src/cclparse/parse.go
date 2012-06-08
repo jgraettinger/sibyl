@@ -59,55 +59,54 @@ func (chart Chart) AddLink(lexicon Lexicon) bool {
 
 func (chart Chart) Use(usedAdjacency *Adjacency) {
 
-    // inbound adjacencies to From are /moved/ through
-    //  the link path created by using this adjacency
-    moveIndex := usedAdjacency.To.Index + isign(usedAdjacency.Position)
+	// inbound adjacencies to From are /moved/ through
+	//  the link path created by using this adjacency
+	moveIndex := usedAdjacency.To.Index + isign(usedAdjacency.Position)
 
-    var side int
-    if usedAdjacency.Position < 0 {
-        side = RIGHT
-    } else {
-        side = LEFT
-    }
+	var side int
+	if usedAdjacency.Position < 0 {
+		side = RIGHT
+	} else {
+		side = LEFT
+	}
 
-    usedAdjacency.Used = true
+	usedAdjacency.Used = true
 
-    // using this adjacency creates a new one
-    newAdjacency := new(Adjacency)
-    newAdjacency.From = usedAdjacency.From
-    newAdjacency.Position = usedAdjacency.Position + isign(usedAdjacency.Position)
+	// using this adjacency creates a new one
+	newAdjacency := new(Adjacency)
+	newAdjacency.From = usedAdjacency.From
+	newAdjacency.Position = usedAdjacency.Position + isign(usedAdjacency.Position)
 
-    if moveIndex == -1 {
-        newAdjacency.To = nil
-    } else if moveIndex == len(chart.cells) {
-        newAdjacency.To = nil
-        chart.endInbound.Add(newAdjacency)
-    } else {
-        newAdjacency.To = chart.cells[moveIndex]
-        chart.cells[moveIndex].Inbound[side].Add(newAdjacency)
-    }
+	if moveIndex == -1 {
+		newAdjacency.To = nil
+	} else if moveIndex == len(chart.cells) {
+		newAdjacency.To = nil
+		chart.endInbound.Add(newAdjacency)
+	} else {
+		newAdjacency.To = chart.cells[moveIndex]
+		chart.cells[moveIndex].Inbound[side].Add(newAdjacency)
+	}
 
-    newAdjacency.From.Outbound[side].Add(newAdjacency)
+	newAdjacency.From.Outbound[side].Add(newAdjacency)
 
-    // Other adjacencies into To on this side are /moved/
-    //  through the link-path created by using this adjacency
+	// Other adjacencies into To on this side are /moved/
+	//  through the link-path created by using this adjacency
 
-    for adjacency := range usedAdjacency.To.Inbound[side] {
-        if adjacency.Blocked || adjacency.Used {
-            continue
-        }
+	for adjacency := range usedAdjacency.To.Inbound[side] {
+		if adjacency.Blocked || adjacency.Used {
+			continue
+		}
 
-        usedAdjacency.To.Inbound[side].Remove(adjacency)
+		usedAdjacency.To.Inbound[side].Remove(adjacency)
 
-        if moveIndex == -1 {
-            adjacency.To = nil
-        } else if moveIndex == len(chart.cells) {
-            adjacency.To = nil
-            chart.endInbound.Add(adjacency)
-        } else {
-            adjacency.To = chart.cells[moveIndex]
-            chart.cells[moveIndex].Inbound[side].Add(adjacency)
-        }
-    }
+		if moveIndex == -1 {
+			adjacency.To = nil
+		} else if moveIndex == len(chart.cells) {
+			adjacency.To = nil
+			chart.endInbound.Add(adjacency)
+		} else {
+			adjacency.To = chart.cells[moveIndex]
+			chart.cells[moveIndex].Inbound[side].Add(adjacency)
+		}
+	}
 }
-

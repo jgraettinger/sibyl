@@ -20,8 +20,9 @@ type Cell struct {
 }
 
 type Chart struct {
-	cells      []*Cell
-	endInbound AdjacencySet
+	cells         []*Cell
+	endInbound    AdjacencySet
+	stoppingPunc bool
 }
 
 func NewChart() (chart *Chart) {
@@ -42,7 +43,8 @@ type Adjacency struct {
 	Used  bool
 	Depth uint
 
-	Blocked bool
+	Blocked      bool
+	StoppingPunc bool
 }
 
 type AdjacencySet map[*Adjacency]bool
@@ -64,6 +66,10 @@ func (list *AdjacencyList) Add(adjacency *Adjacency) {
 }
 
 func (chart *Chart) AddCell(token string) {
+	if token == "," || token == "." || token == ";" || token == ":" {
+		chart.stoppingPunc = true
+		return
+	}
 
 	var prevCell, nextCell *Cell
 
@@ -82,32 +88,41 @@ func (chart *Chart) AddCell(token string) {
 	for adjacency := range chart.endInbound {
 		delete(chart.endInbound, adjacency)
 
+        if chart.stoppingPunc && adjacency.From == prevCell {
+            // this direct adjacency is prohibited by punctuation
+            adjacency.Blocked = true
+            adjacency.StoppingPunc = true
+        }
+
 		adjacency.To = nextCell
 		nextCell.Inbound[LEFT].Add(adjacency)
 	}
 
 	// add nextCell => prevCell adjacency 
-	{
-		adjacency := new(Adjacency)
-		adjacency.From = nextCell
-		adjacency.To = prevCell
-		adjacency.Position = -1
+	adjacency := new(Adjacency)
+	adjacency.From = nextCell
+	adjacency.To = prevCell
+	adjacency.Position = -1
 
-		nextCell.Outbound[LEFT].Add(adjacency)
-		if prevCell != nil {
-			prevCell.Inbound[RIGHT].Add(adjacency)
-		}
+    if chart.stoppingPunc {
+        adjacency.Blocked = true
+        adjacency.StoppingPunc = true
+    }
+
+	nextCell.Outbound[LEFT].Add(adjacency)
+	if prevCell != nil {
+		prevCell.Inbound[RIGHT].Add(adjacency)
 	}
 
 	// add nextCell => {end} adjacency
-	{
-		adjacency := new(Adjacency)
-		adjacency.From = nextCell
-		adjacency.Position = 1
+	adjacency = new(Adjacency)
+	adjacency.From = nextCell
+	adjacency.Position = 1
 
-		nextCell.Outbound[RIGHT].Add(adjacency)
-		chart.endInbound.Add(adjacency)
-	}
+	nextCell.Outbound[RIGHT].Add(adjacency)
+	chart.endInbound.Add(adjacency)
+
+    chart.stoppingPunc = false
 }
 
 func (chart *Chart) AsGraphviz() string {
@@ -132,24 +147,24 @@ func (chart *Chart) AsGraphviz() string {
 			label = fmt.Sprintf("%d", adjacency.Depth)
 		}
 
-        var weight int
+		var weight int
 		if adjacency.To != nil {
 			to = fmt.Sprintf("tok_%d", adjacency.To.Index)
-            weight = len(chart.cells) - iabs(adjacency.From.Index - adjacency.To.Index)
+			weight = len(chart.cells) - iabs(adjacency.From.Index-adjacency.To.Index)
 		} else if left {
 			to = "tok_begin"
-            weight = len(chart.cells) - (adjacency.From.Index + 1)
+			weight = len(chart.cells) - (adjacency.From.Index + 1)
 		} else {
 			to = "tok_end"
-            weight = len(chart.cells) - (len(chart.cells) - adjacency.From.Index)
+			weight = len(chart.cells) - (len(chart.cells) - adjacency.From.Index)
 		}
 
-        var constraint bool
-        if adjacency.Position < 0 {
-            constraint = false
-        } else {
-            constraint = true
-        }
+		var constraint bool
+		if adjacency.Position < 0 {
+			constraint = false
+		} else {
+			constraint = true
+		}
 
 		return fmt.Sprintf("  tok_%d -> %v [label=\"%v\",style=\"%v\",constraint=%v,weight=%v]",
 			adjacency.From.Index, to, label, style, constraint, weight)
