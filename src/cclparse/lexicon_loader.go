@@ -1,5 +1,5 @@
 package cclparse
-
+/*
 import (
     "io"
     "os"
@@ -55,4 +55,4 @@ func NewLexiconFromJson(path string) (lexicon Lexicon, err error) {
     err = nil
     return
 }
-
+*/

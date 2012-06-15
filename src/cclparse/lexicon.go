@@ -39,27 +39,27 @@ func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics) (
 		return
 	}
 
-	if label.IsClass() && prototype.out > 0 {
+	if label.IsClass() && prototype.Out > 0 {
 		linkWeight = fmin(labelWeight, prototype.OutNorm())
 		return
 	}
 
 	if label.IsAdjacency() {
-		if prototype.in > 0 {
+		if prototype.In > 0 {
 			linkWeight = fmin(labelWeight, prototype.InNorm())
-		} else if float64(prototype.inRaw) > fabs(prototype.in) {
+		} else if float64(prototype.InRaw) > fabs(prototype.In) {
 			linkWeight = fmin(labelWeight, prototype.InRawNorm())
 		}
 
 		if linkWeight != 0 {
-			if float64(prototype.inRaw) < 0 && prototype.out <= 0 {
+			if float64(prototype.InRaw) < 0 && prototype.Out <= 0 {
 				linkDepth = 1
 			}
 			return
 		}
 	}
 
-	if prototype.out <= 0 && prototype.in <= 0 && (label.IsAdjacency() || prototype.out == 0) {
+	if prototype.Out <= 0 && prototype.In <= 0 && (label.IsAdjacency() || prototype.Out == 0) {
 		linkWeight = labelWeight
 		return
 	}

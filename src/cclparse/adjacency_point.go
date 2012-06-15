@@ -1,6 +1,7 @@
 package cclparse
 
 import (
+	"encoding/json"
 	"fmt"
 	"invariant"
 	"strings"
@@ -18,17 +19,19 @@ func (this AdjacencyPoint) Sign() int {
 	return 1
 }
 
+type LabelWeights map[Label]float64
+
 type AdjacencyStatistics struct {
 	AdjacencyPoint
 
-	count uint64
-	stop  uint64
-	inRaw int64
+	Count uint64
+	Stop  uint64
+	InRaw int64
 
-	out float64
-	in  float64
+	Out float64
+	In  float64
 
-	labelWeights map[Label]float64
+	LabelWeights LabelWeights
 }
 
 func NewAdjacencyStatistics(point AdjacencyPoint) (
@@ -36,70 +39,40 @@ func NewAdjacencyStatistics(point AdjacencyPoint) (
 
 	this = new(AdjacencyStatistics)
 	this.AdjacencyPoint = point
-	this.labelWeights = make(map[Label]float64)
+	this.LabelWeights = make(map[Label]float64)
 	return
 }
 
-func (this *AdjacencyStatistics) Count() float64 {
-	if this == nil {
-		return 0
-	}
-	return float64(this.count)
-}
-func (this *AdjacencyStatistics) Stop() float64 {
-	if this == nil {
-		return 0
-	}
-	return float64(this.stop)
-}
-func (this *AdjacencyStatistics) InRaw() float64 {
-	if this == nil {
-		return 0
-	}
-	return float64(this.inRaw)
-}
 func (this *AdjacencyStatistics) InRawNorm() float64 {
 	if this == nil {
 		return 0
 	}
-	return float64(this.inRaw) / float64(this.count)
-}
-func (this *AdjacencyStatistics) Out() float64 {
-	if this == nil {
-		return 0
-	}
-	return this.out
+	return float64(this.InRaw) / float64(this.Count)
 }
 func (this *AdjacencyStatistics) OutNorm() float64 {
 	if this == nil {
 		return 0
 	}
-	return this.out / float64(this.count)
-}
-func (this *AdjacencyStatistics) In() float64 {
-	if this == nil {
-		return 0
-	}
-	return this.in
+	return this.Out / float64(this.Count)
 }
 func (this *AdjacencyStatistics) InNorm() float64 {
 	if this == nil {
 		return 0
 	}
-	return this.in / float64(this.count)
+	return this.In / float64(this.Count)
 }
 func (this *AdjacencyStatistics) LabelWeightNorm(label Label) float64 {
 	if this == nil {
 		return 0
 	}
-	return this.labelWeights[label] / float64(this.count)
+	return this.LabelWeights[label] / float64(this.Count)
 }
 func (this *AdjacencyStatistics) HasLargeStop() bool {
 	if this == nil {
 		return true
 	}
-	for _, weight := range this.labelWeights {
-		if weight > float64(this.stop) {
+	for _, weight := range this.LabelWeights {
+		if weight > float64(this.Stop) {
 			return false
 		}
 	}
@@ -112,17 +85,17 @@ func bestMatchingLabel(xOut, yIn *AdjacencyStatistics) (
 	invariant.NotNil(xOut)
 	invariant.NotNil(yIn)
 
-	for label, weight := range xOut.labelWeights {
-		if weight <= xOut.Stop() {
+	for label, weight := range xOut.LabelWeights {
+		if weight <= float64(xOut.Stop) {
 			continue
 		}
 
 		if label.Type == ADJACENCY && label.Token == yIn.Token {
 			// l = (y, 1); corresponding weight of yIn is defined to be 1
-			weight /= xOut.Count()
+			weight /= float64(xOut.Count)
 		} else {
-			weight = fmin(weight/xOut.Count(),
-				yIn.LabelWeightNorm(label.Flip()))
+			weight = fmin(
+				xOut.LabelWeightNorm(label), yIn.LabelWeightNorm(label.Flip()))
 		}
 
 		if weight > bestWeight {
@@ -135,11 +108,11 @@ func bestMatchingLabel(xOut, yIn *AdjacencyStatistics) (
 
 func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 
-	this.count += 1
+	this.Count += 1
 
 	// tick label reflecting direct adjacency with token
 	directLabel := Label{ADJACENCY, token}
-	this.labelWeights[directLabel] += 1
+	this.LabelWeights[directLabel] += 1
 
 	// lookup this adjacency's inverse
 	inverse := lexicon[AdjacencyPoint{token, -this.Sign()}]
@@ -148,10 +121,10 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 		// for other labels of the inverse adjacency, add normalized weight
 		//  contributions to corresonding flipped labels. Very reminiscent of the
 		//  power method for finding the largest eigen-value of a sparse matrix...
-		norm := float64(inverse.count)
-		for label, weight := range inverse.labelWeights {
+		norm := float64(inverse.Count)
+		for label, weight := range inverse.LabelWeights {
 			if label != directLabel {
-				this.labelWeights[label.Flip()] += weight / norm
+				this.LabelWeights[label.Flip()] += weight / norm
 			}
 		}
 	}
@@ -168,24 +141,24 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 		}
 
 		// TODO HACK - I think this belongs before the return
-		//  and shouldn't be guarded by labelWeights
+		//  and shouldn't be guarded by LabelWeights
 
-		if len(inverse.labelWeights) != 0 {
+		if len(inverse.LabelWeights) != 0 {
 			// a link from inverse to this is unlikely
-			this.inRaw += -1
+			this.InRaw += -1
 		}
 	} else {
 		flippedInverse := lexicon[AdjacencyPoint{token, this.Sign()}]
 
 		if flippedInverse == nil || flippedInverse.HasLargeStop() {
-			this.inRaw += 1
+			this.InRaw += 1
 		}
 	}
 	invariant.NotNil(inverse)
 
 	// calculate smoothed Out & In updates
-	this.out += inverse.InRawNorm()
-	this.in += inverse.OutNorm()
+	this.Out += inverse.InRawNorm()
+	this.In += inverse.OutNorm()
 
 }
 
@@ -193,20 +166,20 @@ func (this *AdjacencyStatistics) fold(other *AdjacencyStatistics) {
 
 	invariant.Equal(this.AdjacencyPoint, other.AdjacencyPoint)
 
-	this.count += other.count
-	this.stop += other.stop
-	this.inRaw += other.inRaw
-	this.out += other.out
-	this.in += other.in
+	this.Count += other.Count
+	this.Stop += other.Stop
+	this.InRaw += other.InRaw
+	this.Out += other.Out
+	this.In += other.In
 
-	for label, weight := range other.labelWeights {
-		this.labelWeights[label] += weight
+	for label, weight := range other.LabelWeights {
+		this.LabelWeights[label] += weight
 	}
 }
 
 func (this *AdjacencyStatistics) updateFromBlocking() {
-	this.count += 1
-	this.stop += 1
+	this.Count += 1
+	this.Stop += 1
 }
 
 func (this *AdjacencyPoint) String() string {
@@ -217,10 +190,46 @@ func (this *AdjacencyStatistics) String() string {
 	parts := []string{
 		fmt.Sprintf("Point: %v", this.AdjacencyPoint.String()),
 		fmt.Sprintf("\tCount %v Stop %v In* %v Out %v In %v",
-			this.count, this.stop, this.inRaw, this.out, this.in)}
+			this.Count, this.Stop, this.InRaw, this.Out, this.In)}
 
-	for label, weight := range this.labelWeights {
+	for label, weight := range this.LabelWeights {
 		parts = append(parts, fmt.Sprintf("\t%v: %v", label, weight))
 	}
 	return strings.Join(parts, "\n")
+}
+
+func (self *AdjacencyStatistics) MarshalJSON() ([]byte, error) {
+
+	type AsJson struct {
+		Token        string
+		Position     int
+		Count        uint64
+		Stop         uint64
+		InRaw        int64
+		Out          float64
+		In           float64
+		LabelWeights LabelWeights
+	}
+
+	asJson := AsJson{
+		Token:        self.Token,
+		Position:     self.Position,
+		Count:        self.Count,
+		Stop:         self.Stop,
+		InRaw:        self.InRaw,
+		Out:          self.Out,
+		In:           self.In,
+		LabelWeights: self.LabelWeights,
+	}
+    return json.Marshal(asJson)
+}
+
+func (labelWeights LabelWeights) MarshalJSON() (result []byte, err error) {
+	stringWeights := make(map[string]float64)
+
+	for label, weight := range labelWeights {
+		stringWeights[label.String()] = weight
+	}
+	result, err = json.Marshal(stringWeights)
+	return
 }

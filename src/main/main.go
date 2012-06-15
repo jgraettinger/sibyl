@@ -1,32 +1,62 @@
 package main
 
 import (
-	"fmt"
-    "os"
+	"bufio"
 	"cclparse"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"strings"
 )
 
 func main() {
 
-    lexicon := cclparse.NewLexicon()
+	lexicon := cclparse.NewLexicon()
 
-	chart := cclparse.NewChart()
-	for _, token := range([]string{"this", "is", "a", "hello", "world", "sentence"}) {
-		chart.AddCell(token)
+	file, err := os.Open(os.Args[1])
+	if err != nil {
+		log.Panic(err)
 	}
-    lexicon.Learn(chart)
 
-	chart = cclparse.NewChart()
-	for _, token := range([]string{"that", "sentence", ",", "is", "a", "new", "example"}) {
-		chart.AddCell(token)
+	input := bufio.NewReader(file)
 
-        for chart.AddLink(lexicon) {
-        }
+	var chart *cclparse.Chart
+	for {
+		var tokens []string
+
+		if line, isPrefix, err := input.ReadLine(); isPrefix {
+			log.Panic("line too long")
+		} else if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Panic(err)
+		} else {
+			tokens = strings.Split(strings.ToLower(string(line)), " ")
+		}
+
+		chart = cclparse.NewChart()
+		for _, token := range tokens {
+			chart.AddCell(token)
+			for chart.AddLink(lexicon) {
+			}
+		}
+		lexicon.Learn(chart)
 	}
-    lexicon.Learn(chart)
 
-	fmt.Println(chart.AsGraphviz())
+	if graphOut, err := os.Create("/tmp/chart.graphviz"); err != nil {
+		log.Panic(err)
+	} else {
+		graphOut.Write([]byte(chart.AsGraphviz()))
+		graphOut.Close()
+	}
 
-    fmt.Fprintln(os.Stderr, lexicon)
+	for _, value := range lexicon {
+		bytes, err := json.Marshal(value)
+		if err != nil {
+			log.Panic(err)
+		}
+		fmt.Println(string(bytes))
+	}
 }
-
