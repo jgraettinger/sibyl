@@ -1,9 +1,11 @@
 package cclparse
-
+/*
 import (
 	"invariant"
 	"strings"
+    "ccl/parse"
 )
+
 
 type Lexicon map[AdjacencyPoint]*AdjacencyStatistics
 
@@ -66,7 +68,7 @@ func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics) (
 	return
 }
 
-func (lexicon Lexicon) Score(adjacency *Adjacency) (
+func (lexicon Lexicon) Score(adjacency *parse.Adjacency) (
 	linkWeight float64, linkDepth uint8) {
 
 	if adjacency.To == nil {
@@ -94,10 +96,12 @@ func (lexicon Lexicon) Score(adjacency *Adjacency) (
 	return
 }
 
-func (this Lexicon) Learn(chart *Chart) {
+func (lexicon Lexicon) Learn(chart *parse.Chart) {
 
 	var deltas []*AdjacencyStatistics
 
+	// Closure which adds to 'deltas' the appropriate
+	// lexicon update for an argument Adjacency.
 	update := func(adjacency *Adjacency) {
 
 		point := AdjacencyPoint{adjacency.From.Token, adjacency.Position}
@@ -106,24 +110,36 @@ func (this Lexicon) Learn(chart *Chart) {
 		if adjacency.To == nil || adjacency.StoppingPunc {
 			delta.updateFromBlocking()
 		} else {
-			delta.update(this, adjacency.To.Token)
+			delta.update(lexicon, adjacency.To.Token)
 		}
 
 		deltas = append(deltas, delta)
 	}
 
+	// Compute lexicon update deltas for every outbound link
+	// of every cell in the chart. By computing deltas rather
+	// than directly updating the lexicon, we isolate updates
+	// from early cells from affecting updates from later ones.
 	for _, cell := range chart.cells {
 		for _, adjacency := range cell.Outbound[LEFT] {
+
+			// TODO HACK : I don't think this should be here. To match cclparse behavior
+			if !adjacency.Used && adjacency.Position <= -2 && adjacency.To != nil {
+				if _, okay := lexicon[AdjacencyPoint{adjacency.To.Token, 1}]; !okay {
+					continue
+				}
+			}
+
 			update(adjacency)
 		}
 		for _, adjacency := range cell.Outbound[RIGHT] {
 			update(adjacency)
 		}
 	}
-
+	// Fold each delta into the lexicon.
 	for _, delta := range deltas {
-		if stats, found := this[delta.AdjacencyPoint]; !found {
-			this[delta.AdjacencyPoint] = delta
+		if stats, found := lexicon[delta.AdjacencyPoint]; !found {
+			lexicon[delta.AdjacencyPoint] = delta
 		} else {
 			stats.fold(delta)
 		}
@@ -137,3 +153,4 @@ func (this Lexicon) String() string {
 	}
 	return strings.Join(parts, "\n")
 }
+*/

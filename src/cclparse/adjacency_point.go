@@ -1,5 +1,5 @@
 package cclparse
-
+/*
 import (
 	"encoding/json"
 	"fmt"
@@ -18,8 +18,6 @@ func (this AdjacencyPoint) Sign() int {
 	}
 	return 1
 }
-
-type LabelWeights map[Label]float64
 
 type AdjacencyStatistics struct {
 	AdjacencyPoint
@@ -122,8 +120,8 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 		//  contributions to corresonding flipped labels. Very reminiscent of the
 		//  power method for finding the largest eigen-value of a sparse matrix...
 		norm := float64(inverse.Count)
-		for label, weight := range inverse.LabelWeights {
-			if label != directLabel {
+		for label, weight := range inverse.LabelWeights.FilterToTopN(1000) {
+			if label.Flip() != directLabel {
 				this.LabelWeights[label.Flip()] += weight / norm
 			}
 		}
@@ -233,3 +231,4 @@ func (labelWeights LabelWeights) MarshalJSON() (result []byte, err error) {
 	result, err = json.Marshal(stringWeights)
 	return
 }
+*/
