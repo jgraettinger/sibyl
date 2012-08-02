@@ -5,6 +5,61 @@ import (
 	"testing"
 )
 
+type Expect struct {
+	index int
+
+	leftAdjacency  *Cell
+	leftBlocked    bool
+	rightAdjacency *Cell
+	rightBlocked   bool
+
+	leftPathD0, leftPathD1   *Cell
+	rightPathD0, rightPathD1 *Cell
+}
+
+func checkExpectations(t *testing.T, chart *Chart, expectations []Expect) {
+
+	checkLink := func(link *Link, expectedPath *Cell) {
+		if link == nil {
+			if expectedPath != nil {
+                t.Errorf("Have nil link but expected path to %v", expectedPath)
+            } else {
+                // Both are nil
+            }
+		} else {
+		    if expectedPath == nil {
+			    t.Errorf("Expected nil link, but have %v", link)
+            } else if *link.FurthestPath != expectedPath {
+				t.Errorf("Expected path to %v, not %v to path %v",
+					expectedPath, link, *link.FurthestPath)
+            }
+		}
+	}
+
+	checkAdjacency := func(adj *Adjacency, cell *Cell, blocked bool) {
+		if adj.To != cell {
+			t.Errorf("expected adjacency to %v, not %v", cell, adj)
+		}
+		if adj.IsBlocked() != blocked {
+			t.Errorf("expected blocking %v", blocked)
+		}
+	}
+
+	for _, e := range expectations {
+		cell := chart.Cells[e.index]
+
+		checkAdjacency(cell.OutboundAdjacency[LEFT],
+			e.leftAdjacency, e.leftBlocked)
+		checkAdjacency(cell.OutboundAdjacency[RIGHT],
+			e.rightAdjacency, e.rightBlocked)
+
+		checkLink(cell.LastOutboundLinkD0[LEFT], e.leftPathD0)
+		checkLink(cell.LastOutboundLinkD1[LEFT], e.leftPathD1)
+		checkLink(cell.LastOutboundLinkD0[RIGHT], e.rightPathD0)
+		checkLink(cell.LastOutboundLinkD1[RIGHT], e.rightPathD1)
+	}
+}
+
 func TestChart_AddCell(t *testing.T) {
 	chart := NewChart()
 	W, X, Y := 0, 1, 2
@@ -46,29 +101,88 @@ func TestChart_AddCell(t *testing.T) {
 	assert.IsTrue(chart.Cells[Y].OutboundAdjacency[LEFT].IsBlocked())
 }
 
+func TestChart_SimpleLinkPaths(t *testing.T) {
+	chart := NewChart()
+	W, X, Y, Z := 0, 1, 2, 3
 
-func TestChart_SimpleLinkPaths(l *testing.T) {
-    chart := NewChart()
-    W, X, Y, Z = 0, 1, 2
+	chart.AddCell("W")
+	chart.AddCell("X")
+	chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 1)
 
-    chart.AddCell("x")
-    chart.AddCell("y")
-    chart.Use(chart.Cells[X].OutboundAdjacency[RIGHT], 0)
+	chart.AddCell("Y")
+	chart.Use(chart.Cells[X].OutboundAdjacency[RIGHT], 0)
+	chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 0)
+
+	chart.AddCell("Z")
+	chart.Use(chart.Cells[Z].OutboundAdjacency[LEFT], 1)
+
+	c := chart.Cells
+	expectations := []Expect{
+		{W, nil, false, c[Z], false, nil, nil, nil, c[Y]},
+		{X, c[W], false, c[Z], false, nil, nil, c[Y], nil},
+		{Y, c[W], false, c[Z], false, c[X], nil, nil, nil},
+		{Z, c[W], false, nil, false, nil, c[X], nil, nil},
+	}
+	checkExpectations(t, chart, expectations)
+}
+
+func TestChart_LinkPathForward(t *testing.T) {
+	chart := NewChart()
+	V, W, X, Y, Z := 0, 1, 2, 3, 4
+
+	chart.AddCell("V")
+	chart.AddCell("W")
+	chart.Use(chart.Cells[V].OutboundAdjacency[RIGHT], 0)
+
+	chart.AddCell("X")
+	chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 0)
+
+	chart.AddCell("Y")
+	chart.Use(chart.Cells[X].OutboundAdjacency[RIGHT], 0)
+
+    chart.AddCell("Z")
+    chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 1)
+
+	c := chart.Cells
+	expectations := []Expect{
+		{V, nil, false, nil, false, nil, nil, c[Z], nil},
+		{W, c[V], false, nil, false, nil, nil, c[Y], c[Z]},
+		{X, c[W], false, c[Z], true, nil, nil, c[Y], nil},
+		{Y, c[X], false, c[Z], true, nil, nil, nil, nil},
+		{Z, c[Y], false, nil, false, nil, nil, nil, nil},
+	}
+	checkExpectations(t, chart, expectations)
+}
+
+func TestChart_LinkPathBackward(t *testing.T) {
+	chart := NewChart()
+	V, W, X, Y, Z := 0, 1, 2, 3, 4
+
+	chart.AddCell("V")
+	chart.AddCell("W")
+    chart.AddCell("X")
+    chart.Use(chart.Cells[X].OutboundAdjacency[LEFT], 0)
+
+    chart.AddCell("Y")
     chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 0)
+    chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 1)
 
-    chart.AddCell("z")
-    chart.Use(chart.Cells[Y].OutboundAdjacency[RIGHT], 0)
+    chart.AddCell("Z")
     chart.Use(chart.Cells[Z].OutboundAdjacency[LEFT], 0)
 
-    assert.Equal(*chart.Cells[X].LastOutboundLinkD0[RIGHT].FurthestPath,
-        chart.Cells[Z])
-    assert.Equal(*chart.Cells[X].LastOutboundLinkD0[RIGHT].FurthestPath,
-        chart.Cells[Z])
-
+	c := chart.Cells
+	expectations := []Expect{
+		{V, nil, false, c[W], false, nil, nil, nil, nil},
+		{W, c[V], true, c[X], false, nil, nil, nil, nil},
+		{X, c[V], true, c[Y], false, c[W], nil, nil, nil},
+		{Y, nil, false, c[Z], false, c[W], c[V], nil, nil},
+		{Z, nil, false, nil, false, c[V], nil, nil, nil},
+	}
+	checkExpectations(t, chart, expectations)
 }
 
 
-func TestChart_UseExtended(l *testing.T) {
+func TestChart_UseExtended(t *testing.T) {
 	chart := NewChart()
 	T, U, V, W, X, Y, Z := 0, 1, 2, 3, 4, 5, 6
 
@@ -99,18 +213,6 @@ func TestChart_UseExtended(l *testing.T) {
 
 	// Use table-driven testing to verify expectations about
 	// remaining graph adjacencies and link paths.
-	type Expect struct {
-		index int
-
-		leftAdjacency  *Cell
-		leftBlocked    bool
-		rightAdjacency *Cell
-		rightBlocked   bool
-
-		leftPathD0, leftPathD1   *Cell
-		rightPathD0, rightPathD1 *Cell
-	}
-
 	c := chart.Cells
 	expectations := []Expect{
 		{T, nil, false, c[Y], false, nil, nil, c[X], nil},
@@ -121,42 +223,8 @@ func TestChart_UseExtended(l *testing.T) {
 		{Y, nil, false, nil, false, c[U], c[T], nil, c[Z]},
 		{Z, c[Y], false, nil, false, nil, nil, nil, nil},
 	}
+	checkExpectations(t, chart, expectations)
 
-	for _, e := range expectations {
-		cell := chart.Cells[e.index]
-
-        checkAdjacency := func(adj *Adjacency, cell *Cell, blocked bool) {
-            if adj.To != nil {
-                l.Errorf("expected adjacency %v, not %v", cell, adj)
-            }
-            if adj.IsBlocked() != blocked {
-                l.Errorf("expected blocking %v", blocked)
-            }
-        }
-
-        checkAdjacency(cell.OutboundAdjacency[LEFT],
-            e.leftAdjacency, e.leftBlocked)
-        checkAdjacency(cell.OutboundAdjacency[RIGHT],
-            e.rightAdjacency, e.rightBlocked)
-
-		checkLink := func(cell *Cell, link *Link) {
-			if cell == nil && link != nil {
-				l.Errorf("non-nil link path: %v", link)
-			} else if link == nil {
-				l.Errorf("expected non-nil link from cell: %v", cell)
-			} else {
-				if *link.FurthestPath != cell {
-					l.Errorf("expected path %v, not %v",
-						cell, link.FurthestPath)
-				}
-			}
-		}
-
-        checkLink(e.leftPathD0, cell.LastOutboundLinkD0[LEFT])
-        checkLink(e.leftPathD1, cell.LastOutboundLinkD1[LEFT])
-        checkLink(e.rightPathD0, cell.LastOutboundLinkD0[RIGHT])
-        checkLink(e.rightPathD1, cell.LastOutboundLinkD1[RIGHT])
-	}
 }
 
 /*

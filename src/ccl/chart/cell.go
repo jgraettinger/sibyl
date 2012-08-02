@@ -24,7 +24,7 @@ type Cell struct {
 	InboundLink   [2]*Link
 
 	// Last-added d=0 & d=1 links, reflecting the furthest link of each depth
-	// from this cell. Due to montonicity, the d=1 link will either be null,
+	// from this cell. Due to montonicity, the d=1 link will either be nil,
 	// or will be a further adjancency than the d=0 link.
 	LastOutboundLinkD0 [2]*Link
 	LastOutboundLinkD1 [2]*Link

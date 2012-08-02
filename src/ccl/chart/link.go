@@ -54,16 +54,10 @@ func (link *Link) ForkFurthestPath() *BoxedCellPointer {
 	*newPath = *oldPath
 
 	next := link
-	for {
+	for next != nil {
 		// Replace the boxed path instance along this link path
 		next.FurthestPath = newPath
-
-		outLength := len(next.To.OutboundLinks[forward.Side()])
-		if outLength == 0 {
-			break
-		} else {
-			next = next.To.OutboundLinks[forward.Side()][outLength-1]
-		}
+        next = forward.OutboundLinks(next.To).Last()
 	}
 	return oldPath
 }
