@@ -80,16 +80,16 @@ func (chart *Chart) AddCell(token string) {
 	chart.stoppingPunc = false
 }
 
-func (chart *Chart) Use(usedAdjacency *Adjacency, targetDepth uint) {
-	invariant.IsFalse(usedAdjacency.BlockedDepths[targetDepth])
+func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
+	invariant.IsFalse(usedAdjacency.BlockedDepths[usedDepth])
 
 	forward := DirectionFromPosition(usedAdjacency.Position)
 	cellFrom, cellTo := usedAdjacency.From, usedAdjacency.To
 
 	log.Printf("Using adjacency %v at depth %v, direction %v",
-		*usedAdjacency, targetDepth, forward)
+		*usedAdjacency, usedDepth, forward)
 
-	createdLink := NewLink(usedAdjacency, targetDepth)
+	createdLink := NewLink(usedAdjacency, usedDepth)
 
 	// Update the link path to reflect this new link.
 	if forward == LEFT_TO_RIGHT {
@@ -138,6 +138,11 @@ func (chart *Chart) Use(usedAdjacency *Adjacency, targetDepth uint) {
 	newAdjacency := new(Adjacency)
 	newAdjacency.From = cellFrom
 	newAdjacency.Position = forward.Increment(usedAdjacency.Position)
+
+	// 3.2.1 Montonicity: New adjacencies must have depth >= previous ones.
+	if usedDepth == 1 {
+		newAdjacency.BlockedDepths[0] = true
+	}
 
 	// Replace the outbound adjacency, and add the new outbound link.
 	forward.OutboundLinks(cellFrom).Add(createdLink)

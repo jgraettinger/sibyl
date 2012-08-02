@@ -22,17 +22,17 @@ func checkExpectations(t *testing.T, chart *Chart, expectations []Expect) {
 	checkLink := func(link *Link, expectedPath *Cell) {
 		if link == nil {
 			if expectedPath != nil {
-                t.Errorf("Have nil link but expected path to %v", expectedPath)
-            } else {
-                // Both are nil
-            }
+				t.Errorf("Have nil link but expected path to %v", expectedPath)
+			} else {
+				// Both are nil
+			}
 		} else {
-		    if expectedPath == nil {
-			    t.Errorf("Expected nil link, but have %v", link)
-            } else if *link.FurthestPath != expectedPath {
+			if expectedPath == nil {
+				t.Errorf("Expected nil link, but have %v", link)
+			} else if *link.FurthestPath != expectedPath {
 				t.Errorf("Expected path to %v, not %v to path %v",
 					expectedPath, link, *link.FurthestPath)
-            }
+			}
 		}
 	}
 
@@ -140,8 +140,8 @@ func TestChart_LinkPathForward(t *testing.T) {
 	chart.AddCell("Y")
 	chart.Use(chart.Cells[X].OutboundAdjacency[RIGHT], 0)
 
-    chart.AddCell("Z")
-    chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 1)
+	chart.AddCell("Z")
+	chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 1)
 
 	c := chart.Cells
 	expectations := []Expect{
@@ -160,15 +160,15 @@ func TestChart_LinkPathBackward(t *testing.T) {
 
 	chart.AddCell("V")
 	chart.AddCell("W")
-    chart.AddCell("X")
-    chart.Use(chart.Cells[X].OutboundAdjacency[LEFT], 0)
+	chart.AddCell("X")
+	chart.Use(chart.Cells[X].OutboundAdjacency[LEFT], 0)
 
-    chart.AddCell("Y")
-    chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 0)
-    chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 1)
+	chart.AddCell("Y")
+	chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 0)
+	chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 1)
 
-    chart.AddCell("Z")
-    chart.Use(chart.Cells[Z].OutboundAdjacency[LEFT], 0)
+	chart.AddCell("Z")
+	chart.Use(chart.Cells[Z].OutboundAdjacency[LEFT], 0)
 
 	c := chart.Cells
 	expectations := []Expect{
@@ -181,6 +181,19 @@ func TestChart_LinkPathBackward(t *testing.T) {
 	checkExpectations(t, chart, expectations)
 }
 
+func TestChart_Montonicity(t *testing.T) {
+	chart := NewChart()
+	Y, Z := 0, 1
+
+	chart.AddCell("Y")
+	chart.AddCell("Z")
+	chart.Use(chart.Cells[Y].OutboundAdjacency[RIGHT], 1)
+	chart.Use(chart.Cells[Z].OutboundAdjacency[LEFT], 1)
+
+	// Outbound adjacencies created through linking have depth 0 blocked.
+	assert.IsTrue(chart.Cells[Y].OutboundAdjacency[RIGHT].BlockedDepths[0])
+	assert.IsTrue(chart.Cells[Z].OutboundAdjacency[LEFT].BlockedDepths[0])
+}
 
 func TestChart_UseExtended(t *testing.T) {
 	chart := NewChart()

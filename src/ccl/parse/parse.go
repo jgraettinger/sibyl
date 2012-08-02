@@ -1,9 +1,9 @@
 package parse
 
 import (
-    //"log"
-    "ccl"
-    . "ccl/chart"
+	//"log"
+	"ccl"
+	. "ccl/chart"
 )
 
 type Parser struct {
@@ -43,7 +43,7 @@ func addBestLink(chart *Chart, scorer ccl.Scorer) bool {
 
 		score, scoreDepth := scorer.Score(adjacency)
 
-        //log.Printf("Adjacency %s has score %v depth %v", adjacency, score, scoreDepth)
+		//log.Printf("Adjacency %s has score %v depth %v", adjacency, score, scoreDepth)
 
 		if score > bestScore && !adjacency.Blocked[scoreDepth] {
 			bestScore = score
@@ -53,7 +53,7 @@ func addBestLink(chart *Chart, scorer ccl.Scorer) bool {
 			bestScore = score
 			bestScoreDepth = 1
 			bestAdjacency = adjacency
-        }
+		}
 	}
 
 	index := len(chart.Cells) - 1
@@ -84,4 +84,3 @@ func addBestLink(chart *Chart, scorer ccl.Scorer) bool {
 	}
 	return false
 }
-
