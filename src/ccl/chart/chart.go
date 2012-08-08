@@ -27,7 +27,7 @@ func (chart *Chart) StoppingPunctuation() {
 	chart.stoppingPunc = true
 }
 
-func (chart *Chart) AddCell(token string) {
+func (chart *Chart) AddCell(token string) *Cell {
 	invariant.IsFalse(IsStoppingPunctuaction(token))
 
 	var prevCell, nextCell *Cell
@@ -45,7 +45,7 @@ func (chart *Chart) AddCell(token string) {
 
 		if chart.stoppingPunc /* && adjacency.From == prevCell */ {
 			// This direct adjacency is prohibited by punctuation.
-			adjacency.BlockedDepths = [2]bool{true, true}
+			adjacency.SpansPunctuation = true
 		}
 
 		adjacency.To = nextCell
@@ -59,7 +59,7 @@ func (chart *Chart) AddCell(token string) {
 	adjacency.Position = -1
 
 	if chart.stoppingPunc {
-		adjacency.BlockedDepths = [2]bool{true, true}
+		adjacency.SpansPunctuation = true
 	}
 
 	nextCell.OutboundAdjacency[LEFT] = adjacency
@@ -78,10 +78,11 @@ func (chart *Chart) AddCell(token string) {
 	chart.endInbound.Add(adjacency)
 
 	chart.stoppingPunc = false
+	return nextCell
 }
 
 func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
-	invariant.IsFalse(usedAdjacency.BlockedDepths[usedDepth])
+	invariant.IsTrue(usedAdjacency.IsUsable())
 
 	forward := DirectionFromPosition(usedAdjacency.Position)
 	cellFrom, cellTo := usedAdjacency.From, usedAdjacency.To
@@ -89,19 +90,21 @@ func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
 	log.Printf("Using adjacency %v at depth %v, direction %v",
 		*usedAdjacency, usedDepth, forward)
 
-	createdLink := NewLink(usedAdjacency, usedDepth)
+	newLink := NewLink(usedAdjacency, usedDepth)
 
 	// Update the link path to reflect this new link.
 	if forward == LEFT_TO_RIGHT {
+        invariant.IsNil(forward.OutboundLinks(cellTo).Last())
+
 		if lastOut := forward.OutboundLinks(cellFrom).Last(); lastOut == nil {
 			// As this is cellFrom's first outbound link in this direction,
 			// using this adjacency doesn't create a new link-path.
 			if chainIn := forward.InboundLink(cellFrom); chainIn != nil {
 				// Extend the existing path.
-				createdLink.FurthestPath = chainIn.FurthestPath
+				newLink.FurthestPath = chainIn.FurthestPath
 			} else {
 				// There is no existing path. Create a new one.
-				createdLink.FurthestPath = new(BoxedCellPointer)
+				newLink.FurthestPath = new(BoxedCellPointer)
 			}
 		} else {
 			// Adding a second outbound link creates a new link-path. Because
@@ -109,28 +112,30 @@ func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
 			// be added to this path. We want antecedent nodes to be updated
 			// with further extensions, while preserving the paths rooted at
 			// the existing outbound link.
-			createdLink.FurthestPath = lastOut.ForkFurthestPath()
+			newLink.FurthestPath = lastOut.ForkFurthestPath()
 		}
 		// This update is visible from all previous links on the path.
-		*createdLink.FurthestPath = createdLink.To
+		*newLink.FurthestPath = newLink.To
 	} else {
+        invariant.IsNil(forward.InboundLink(cellFrom))
+
 		// Any successive links in this direction already exist. Propogate
-		// an existing boxed path back to createdLink.
+		// an existing boxed path back to newLink.
 		if chainOut := forward.OutboundLinks(cellTo).Last(); chainOut != nil {
 			log.Printf("%v has last outbound link %v to %v", cellTo,
 				chainOut, (*Cell)(*chainOut.FurthestPath))
-			createdLink.FurthestPath = chainOut.FurthestPath
+			newLink.FurthestPath = chainOut.FurthestPath
 		} else {
-			createdLink.FurthestPath = new(BoxedCellPointer)
-			*createdLink.FurthestPath = createdLink.To
+			newLink.FurthestPath = new(BoxedCellPointer)
+			*newLink.FurthestPath = newLink.To
 		}
 	}
 
-	log.Printf("Created link %v with path to %v", createdLink,
-		(*Cell)(*createdLink.FurthestPath))
+	log.Printf("Created link %v with path to %v", newLink,
+		(*Cell)(*newLink.FurthestPath))
 
 	// One beyond the link path from cellFrom, is the next adjacency position.
-	nextAdjacencyIndex := forward.Increment((*createdLink.FurthestPath).Index)
+	nextAdjacencyIndex := forward.Increment((*newLink.FurthestPath).Index)
 	log.Printf("nextAdjacencyIndex is %v", nextAdjacencyIndex)
 
 	// 3.2.1 Connectedness: Use of this adjacency creates a new one,
@@ -139,41 +144,37 @@ func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
 	newAdjacency.From = cellFrom
 	newAdjacency.Position = forward.Increment(usedAdjacency.Position)
 
-	// 3.2.1 Montonicity: New adjacencies must have depth >= previous ones.
-	if usedDepth == 1 {
-		newAdjacency.BlockedDepths[0] = true
-	}
-
-	// Replace the outbound adjacency, and add the new outbound link.
-	forward.OutboundLinks(cellFrom).Add(createdLink)
+	// Replace cellFrom's outbound adjacency, and add the new outbound link.
+	forward.OutboundLinks(cellFrom).Add(newLink)
 	forward.SetOutboundAdjacency(cellFrom, newAdjacency)
 
-	if createdLink.Depth == 0 {
-		forward.SetLastOutboundLinkD0(cellFrom, createdLink)
+	if newLink.Depth == 0 {
+		forward.SetLastOutboundLinkD0(cellFrom, newLink)
 	} else {
-		forward.SetLastOutboundLinkD1(cellFrom, createdLink)
+		forward.SetLastOutboundLinkD1(cellFrom, newLink)
+
+		// 3.2.1 Montonicity: New adjacencies must have depth >= previous ones.
+		newAdjacency.MontonicityRestricted = true
 	}
 
-	// Replace the inbound adjacency, and set the inbound link.
+	// Replace cellTo's inbound adjacency, and set the inbound link.
 	forward.InboundAdjacencies(cellTo).Remove(usedAdjacency)
 	chart.updateAdjacencyTo(newAdjacency, nextAdjacencyIndex)
-	forward.SetInboundLink(cellTo, createdLink)
+	forward.SetInboundLink(cellTo, newLink)
 
 	// Examine other inbound adjacencies into cellTo.
 	for adjacency := range forward.InboundAdjacencies(cellTo) {
-		if adjacency.IsBlocked() {
-			continue
-		}
-
 		if !forward.Less(adjacency.From.Index, cellFrom.Index) {
 			// 3.2.2 Covering Links - Adjacencies which are fully covered by 
 			// usedAdjacency are permanently blocked. No further attachments
 			// are possible from cellFrom in the forward direction.
-			log.Printf("Blocking covered %v", adjacency)
-			adjacency.BlockedDepths = [2]bool{true, true}
-		} else {
+			log.Printf("Adjacency covered: %v", adjacency)
+			adjacency.CoveredByLink = true
+		}
+
+		if adjacency.IsMoveable() {
 			// 3.2.1 Connectedness & 3.2.1 Minimality:
-			// Non-covered adjacencies must be shifted through the link-path
+			// Moveable adjacencies must be shifted through the link-path
 			// opened by usedAdjacency. This ensures minimality (as the
 			// adjacency would otherwise be redudant with usedAdjacency), and
 			// connectedness (as an adjacency is opened through to
@@ -185,12 +186,12 @@ func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
 			chart.updateAdjacencyTo(adjacency, nextAdjacencyIndex)
 		}
 	}
+
+	updateBlocking(chart, newLink, newAdjacency)
 	return
 }
 
 func (chart *Chart) updateAdjacencyTo(adjacency *Adjacency, toIndex int) {
-	invariant.IsFalse(adjacency.IsBlocked())
-
 	if toIndex == -1 {
 		invariant.IsTrue(adjacency.Position < 0)
 		adjacency.To = nil

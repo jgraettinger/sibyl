@@ -12,22 +12,33 @@ type Adjacency struct {
 	// The argument attachment position this adjacency reflects
 	Position int
 
-	BlockedDepths [2]bool
+	SpansPunctuation bool
+
+	// Denotes this adjacency is 'covered' by a link spanning
+	// From & To. Covered adjacencies cannot be used (see 3.2.2).
+	CoveredByLink bool
+
+	MontonicityRestricted bool
+
+	Blocking BlockingFlags
 }
 
-func (adjacency *Adjacency) IsBlocked() bool {
-    // TODO: Get rid of this?
-    return adjacency.BlockedDepths[0] && adjacency.BlockedDepths[1]
+func (adjacency *Adjacency) IsUsable() bool {
+	if !adjacency.SpansPunctuation &&
+		!adjacency.CoveredByLink &&
+		adjacency.Blocking&BLOCK_ALL == 0 {
+		return true
+	}
+	return false
 }
 
-func (adjacency *Adjacency) ToIndex(chart *Chart) int {
-    if adjacency.To != nil {
-        return adjacency.To.Index
-    }
-    if adjacency.Position < 0 {
-        return -1
-    }
-    return len(chart.Cells)
+func (adjacency *Adjacency) IsMoveable() bool {
+	if !adjacency.SpansPunctuation &&
+		!adjacency.CoveredByLink &&
+		adjacency.Blocking&BLOCK_ALL == 0 {
+		return true
+	}
+	return false
 }
 
 type AdjacencySet map[*Adjacency]bool
@@ -45,13 +56,22 @@ func (set AdjacencySet) Remove(adjacency *Adjacency) {
 func (adjacency *Adjacency) String() string {
 
 	properties := ""
-	if adjacency.BlockedDepths[0] {
-		properties += ", (Blocked 0)"
+	if adjacency.SpansPunctuation {
+		properties += ", (punc)"
 	}
-	if adjacency.BlockedDepths[1] {
-		properties += ", (Blocked 1)"
+	if adjacency.CoveredByLink {
+		properties += ", (covered)"
+	}
+	if adjacency.MontonicityRestricted {
+		properties += ", (montonicity)"
+	}
+	if adjacency.Blocking&BLOCK_D0 != 0 {
+		properties += ", (partial blocking)"
+	}
+	if adjacency.Blocking&BLOCK_ALL != 0 {
+		properties += ", (full blocking)"
 	}
 
-    return fmt.Sprintf("Adjacency<%v:%d => %v%v>", adjacency.From,
-        adjacency.Position, adjacency.To, properties)
+	return fmt.Sprintf("Adjacency<%v:%d => %v%v>", adjacency.From,
+		adjacency.Position, adjacency.To, properties)
 }

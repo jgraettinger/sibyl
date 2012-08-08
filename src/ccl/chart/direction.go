@@ -158,9 +158,6 @@ func (dir Direction) SetLastOutboundLinkD1(cell *Cell, link *Link) {
     }
 }
 
-
-/*
-
 func (dir Direction) HasFullyBlockedAfter(cell *Cell) bool {
     if dir == LEFT_TO_RIGHT {
         return cell.FullyBlockedAfter[LEFT] != nil
@@ -182,7 +179,7 @@ func (dir Direction) SetFullyBlockedAfter(cell *Cell, index int) {
         cell.FullyBlockedAfter[RIGHT] = &index
     }
 }
-*/
+
 /*
 func (dir Direction) PathBegin(cell *Cell) int {
     return cell.PathBegin[dir.Side()]

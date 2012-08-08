@@ -13,7 +13,7 @@ type Cell struct {
 	// is none. This is used to enforce blocking: specifically, no
 	// adjacency from this node may span beyond BlockedAfter.
 	// (See section 3.2.1, condition 3)
-	// FullyBlockedAfter [2]*int
+	FullyBlockedAfter [2]*int
 
 	// Active (non-linked) outbound adjacencies. Each side has exactly one.
 	OutboundAdjacency [2]*Adjacency
