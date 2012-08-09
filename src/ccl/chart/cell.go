@@ -47,3 +47,21 @@ func NewCell(index int, token string) *Cell {
 func (cell *Cell) String() string {
 	return fmt.Sprintf("%#v@%d", cell.Token, cell.Index)
 }
+
+func (cell *Cell) D0LinkPathReaches(other *Cell) bool {
+	forward := DirectionFromPosition(other.Index - cell.Index)
+
+	link := forward.LastOutboundLinkD0(cell)
+	return link != nil &&
+		!forward.Less((*link.FurthestPath).Index, other.Index)
+}
+func (cell *Cell) D1LinkPathReaches(other *Cell) bool {
+	forward := DirectionFromPosition(other.Index - cell.Index)
+
+	link := forward.LastOutboundLinkD1(cell)
+	return link != nil &&
+		!forward.Less((*link.FurthestPath).Index, other.Index)
+}
+func (cell *Cell) LinkPathReaches(other *Cell) bool {
+    return cell.D0LinkPathReaches(other) || cell.D1LinkPathReaches(other)
+}

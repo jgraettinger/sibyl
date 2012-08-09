@@ -82,13 +82,12 @@ func (chart *Chart) AddCell(token string) *Cell {
 }
 
 func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
-	invariant.IsTrue(usedAdjacency.IsUsable())
-
 	forward := DirectionFromPosition(usedAdjacency.Position)
 	cellFrom, cellTo := usedAdjacency.From, usedAdjacency.To
 
 	log.Printf("Using adjacency %v at depth %v, direction %v",
-		*usedAdjacency, usedDepth, forward)
+		usedAdjacency, usedDepth, forward)
+	invariant.IsTrue(usedAdjacency.RestrictedDepths().Allows(usedDepth))
 
 	newLink := NewLink(usedAdjacency, usedDepth)
 
@@ -152,9 +151,6 @@ func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
 		forward.SetLastOutboundLinkD0(cellFrom, newLink)
 	} else {
 		forward.SetLastOutboundLinkD1(cellFrom, newLink)
-
-		// 3.2.1 Montonicity: New adjacencies must have depth >= previous ones.
-		newAdjacency.MontonicityRestricted = true
 	}
 
 	// Replace cellTo's inbound adjacency, and set the inbound link.
@@ -186,8 +182,7 @@ func (chart *Chart) Use(usedAdjacency *Adjacency, usedDepth uint) {
 			chart.updateAdjacencyTo(adjacency, nextAdjacencyIndex)
 		}
 	}
-
-	updateBlocking(chart, newLink, newAdjacency)
+	updateBlocking(chart, newLink)
 	return
 }
 

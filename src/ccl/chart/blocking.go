@@ -4,83 +4,60 @@ import (
 	"log"
 )
 
-type BlockingFlags byte
-
-const (
-	BLOCK_NONE = 0
-	BLOCK_D0   = 1
-	BLOCK_ALL  = 2
-)
-
-func updateBlocking(chart *Chart, newLink *Link, newAdjacency *Adjacency) {
-	forward := DirectionFromPosition(newLink.Position)
+func (adjacency *Adjacency) BlockingRestriction() (restrict DepthRestriction) {
+	forward := DirectionFromPosition(adjacency.Position)
 	backward := forward.Flip()
 
-	cell := newLink.From
+	// Presence of a backward link into From which isn't from To, blocks d=0.
+	backLink := backward.InboundLink(adjacency.From)
+	if backLink != nil && backLink.From != adjacency.To {
+		log.Printf("Blocking d=0 because of %v", backLink)
+		restrict |= RESTRICT_D0
+	}
 
-	// 3.2.1 Full blocking condition
+	// Spanning a d=1 link of a cell having a path back to From, blocks all.
+	if forward.HasFullyBlockedAfter(adjacency.From) {
+		bound := forward.FullyBlockedAfter(adjacency.From)
+		if forward.Less(bound, adjacency.To.Index) {
+			log.Printf("Block-bound of %v fully blocks", bound)
+			restrict |= RESTRICT_ALL
+		}
+	}
+	return
+}
+
+func updateBlocking(chart *Chart, link *Link) {
+	forward := DirectionFromPosition(link.Position)
+	backward := forward.Flip()
 
 	// Blocking requires that no link may span a d=1 link from a
 	// node which has also has a path to the adjacency base.
 
-	// Retrieve the most recent link from cell, in the other direction.
-	// Due to montonicity if any links are d=1, than so is the last one.
-	backLink := backward.OutboundLinks(cell).Last()
+	// Retrieve the most recent link from the head, but in the other direction.
+	// Due to montonicity if any links are d=1, than the last one is as well.
+	backLink := backward.OutboundLinks(link.From).Last()
 
-	// The head of a d=1 link is a blocking bound which must be
+	// A new d=1 link represents a blocking bound which must be
 	// projected along furthest path extents in both directions.
-	if newLink.Depth == 1 {
-		projectBlocking(chart, newLink, cell.Index)
+	if link.Depth == 1 {
+		projectBlocking(chart, link, link.From.Index)
 		if backLink != nil {
-			projectBlocking(chart, backLink, cell.Index)
+			projectBlocking(chart, backLink, link.From.Index)
 		}
 	} else if backLink != nil && backLink.Depth == 1 {
-		// Cell is a blocking bound to be projected along this link.
-		projectBlocking(chart, newLink, cell.Index)
-	} else if backward.HasFullyBlockedAfter(cell) {
-		// Propogate an earlier constraint along the path extended by newLink.
-		projectBlocking(chart, newLink,
-			backward.FullyBlockedAfter(cell))
-	}
-
-	// If newAdjacency spans FullyBlockedAfter of cell, there must
-	// must be a d=1 link which newAdjacency spans.
-	if forward.HasFullyBlockedAfter(cell) {
-		if bound := forward.FullyBlockedAfter(cell); newAdjacency.To == nil ||
-			forward.Less(bound, newAdjacency.To.Index) {
-
-			log.Printf("Immediately fully blocking new %v (blocked after %v)",
-				newAdjacency, bound)
-			newAdjacency.Blocking |= BLOCK_ALL
-		}
-	}
-
-	// 3.2.1 Partial (d=0) blocking condition
-
-	// Step 1: If there is a backward inbound link into
-	// cell which is not from newAdjacency.To, than d=0 is blocked.
-	if link := backward.InboundLink(cell); link != nil &&
-		link.From != newAdjacency.To {
-		log.Printf("Blocking d=0 of new adjacency because of link %v", link)
-		newAdjacency.Blocking |= BLOCK_D0
-	}
-
-	// Step 2: Inversely, the creation of newLink blocks d=0 of a
-	// current backward adjacency from newLink.To spanning beyond newLink.From.
-	backAdjacency := backward.OutboundAdjacency(newLink.To)
-	log.Printf("backAdjacency is %v", backAdjacency)
-	if backAdjacency.To != newLink.From {
-		log.Printf("Blocking d=0 of %v due to %v", backAdjacency, newLink)
-		backAdjacency.Blocking |= BLOCK_D0
+		// Link head is a blocking bound, due to d=1 link in other direction.
+		projectBlocking(chart, link, link.From.Index)
+	} else if backward.HasFullyBlockedAfter(link.From) {
+		// Propogate an earlier constraint along the path extended by link.
+		projectBlocking(chart, link, backward.FullyBlockedAfter(link.From))
 	}
 }
 
-// Projects blockIndex to all cells reachable on a path from link.
-// Updates blocking of any adacencies affected by the new bound.
 func projectBlocking(chart *Chart, link *Link, blockIndex int) {
-	log.Printf("projecting blocking bound %v along %v", blockIndex, link)
 	forward := DirectionFromPosition(link.Position)
 	backward := forward.Flip()
+
+	log.Printf("Projecting blocking bound %v along %v", blockIndex, link)
 
 	begin := link.To.Index
 	end := forward.Increment((*link.FurthestPath).Index)
@@ -96,14 +73,5 @@ func projectBlocking(chart *Chart, link *Link, blockIndex int) {
 
 		log.Printf("Projecting blocking bound %v to %v", blockIndex, cell)
 		backward.SetFullyBlockedAfter(cell, blockIndex)
-
-		// Does this projection invalidate the current adjacency from cell?
-		adjacency := backward.OutboundAdjacency(cell)
-		if adjacency.To == nil ||
-			backward.Less(blockIndex, adjacency.To.Index) {
-			log.Printf("Fully blocking adjacency %v (%v)",
-				adjacency, blockIndex)
-			adjacency.Blocking |= BLOCK_ALL
-		}
 	}
 }

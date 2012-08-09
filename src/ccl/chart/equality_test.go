@@ -1,26 +1,56 @@
 package chart
-/*
+
 import (
-    "testing"
+	"testing"
 )
 
-func TestEqualityWXYZ(t *testing.T) {
+func checkEquality(t *testing.T, adjacency *Adjacency,
+	expect DepthRestriction) {
 
-    chart := buildChart("w x y z")
-    w, x, y, z := 0, 1, 2, 3
-
-    useAndEqCheck(t, chart, w, x, 0)
-    useAndEqCheck(t, chart, w, y, 1)
-    useAndEqCheck(t, chart, y, z, 0)
-
-    useAndEqCheck(t, chart, z, y, 0)
-    useAndEqCheck(t, chart, z, x, 0)
-    useAndEqCheck(t, chart, z, w, 0)
+	if r := adjacency.EqualityRestriction(); r != expect {
+		t.Errorf("Expected equality %v on %v, but got %v",
+			expect, adjacency, r)
+	}
 }
 
-func useAndEqCheck(t *testing.T, chart *Chart, from, to int, depth uint) {
-    adjacency := adj(chart, from, to)
-    newAdjacency, movedAdjacencies := chart.Use(adjacency, depth)
-    UpdateEquality(chart, adjacency, newAdjacency, movedAdjacencies)
+func TestEquality_NeighborCycle(t *testing.T) {
+	chart, V, W, _, Y, Z := buildFixture()
+
+	chart.Use(V.OutboundAdjacency[RIGHT], 0)
+	chart.Use(Z.OutboundAdjacency[LEFT], 1)
+
+	checkEquality(t, W.OutboundAdjacency[LEFT], RESTRICT_D1)
+	checkEquality(t, Y.OutboundAdjacency[RIGHT], RESTRICT_D0)
 }
-*/
+
+func TestEquality_Extended(t *testing.T) {
+	chart, V, W, X, Y, Z := buildFixture()
+
+	chart.Use(V.OutboundAdjacency[RIGHT], 0)
+	chart.Use(W.OutboundAdjacency[LEFT], 0)
+	chart.Use(X.OutboundAdjacency[LEFT], 0)
+	chart.Use(X.OutboundAdjacency[RIGHT], 1)
+	chart.Use(Y.OutboundAdjacency[RIGHT], 0)
+	chart.Use(Z.OutboundAdjacency[LEFT], 0)
+
+	// Would complete a cycle via d=0 path from X -> V.
+	checkEquality(t, V.OutboundAdjacency[RIGHT], RESTRICT_D1)
+	// Would complete a cycle via d=1 path from X -> Z.
+	checkEquality(t, Z.OutboundAdjacency[LEFT], RESTRICT_D0)
+}
+
+func TestEquality_BackBranch(t *testing.T) {
+	chart, _, W, X, _, Z := buildFixture()
+
+	// This excercises the second condition of equality, where
+	// a "long-link" already exists and we're considering creating
+	// the first link in back-path towards the long-link head.
+
+	chart.Use(W.OutboundAdjacency[RIGHT], 0)
+	chart.Use(X.OutboundAdjacency[LEFT], 0)
+	chart.Use(W.OutboundAdjacency[RIGHT], 1)
+	chart.Use(Z.OutboundAdjacency[LEFT], 0)
+	chart.Use(W.OutboundAdjacency[RIGHT], 1)
+
+	checkEquality(t, Z.OutboundAdjacency[LEFT], RESTRICT_D0)
+}
