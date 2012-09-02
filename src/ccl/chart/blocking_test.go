@@ -72,12 +72,14 @@ func TestFullBlockingProjectedForwardLink(t *testing.T) {
 	chart.use(V.OutboundAdjacency[RIGHT], 0)
 	chart.use(W.OutboundAdjacency[LEFT], 0)
 
-	_ = chart.nextCell()
+	X := chart.nextCell()
 	chart.use(W.OutboundAdjacency[RIGHT], 1)
+	chart.use(X.OutboundAdjacency[LEFT], 1) // Resolves violation
 	checkFullBlockBound(t, V, W)
 
 	Y := chart.nextCell()
 	chart.use(Y.OutboundAdjacency[LEFT], 1)
+	chart.use(X.OutboundAdjacency[RIGHT], 1) // Resolves violation
 
 	Z := chart.nextCell()
 	chart.use(Y.OutboundAdjacency[RIGHT], 0)

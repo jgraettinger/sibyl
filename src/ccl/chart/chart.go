@@ -110,8 +110,11 @@ func (chart *Chart) use(adjacency *Adjacency, depth uint) {
 	// Used adjacencies must be From or To the current (last) cell.
 	{
 		invariant.NotNil(adjacency.To)
+
 		cell := chart.CurrentCell()
 		invariant.IsTrue(adjacency.From == cell || adjacency.To == cell)
+		invariant.IsTrue(chart.minimalViolation == nil ||
+			adjacency.From == cell || adjacency.From == chart.minimalViolation)
 	}
 
 	forward := DirectionFromPosition(adjacency.Position)
@@ -223,6 +226,7 @@ func (chart *Chart) use(adjacency *Adjacency, depth uint) {
 		}
 	}
 	updateBlocking(chart, link)
+	updateResolution(chart, link)
 	return
 }
 
