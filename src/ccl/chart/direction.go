@@ -1,7 +1,7 @@
 package chart
 
 import (
-    "invariant"
+	"invariant"
 )
 
 type Direction bool
@@ -22,18 +22,31 @@ func (dir Direction) Flip() Direction {
 	return !dir
 }
 
-func (dir Direction) Side() int {
-    if dir == LEFT_TO_RIGHT {
-        return LEFT
-    }
-    return RIGHT
+func (dir Direction) SideOut() int {
+	if dir == LEFT_TO_RIGHT {
+		return RIGHT
+	}
+	return LEFT
+}
+func (dir Direction) SideIn() int {
+	if dir == LEFT_TO_RIGHT {
+		return LEFT
+	}
+	return RIGHT
 }
 
 func (dir Direction) String() string {
-    if dir == LEFT_TO_RIGHT {
-        return "LEFT_TO_RIGHT"
-    }
-    return "RIGHT_TO_LEFT"
+	if dir == LEFT_TO_RIGHT {
+		return "LEFT_TO_RIGHT"
+	}
+	return "RIGHT_TO_LEFT"
+}
+
+func (dir Direction) PositionSign() int {
+	if dir == LEFT_TO_RIGHT {
+		return 1
+	}
+	return -1
 }
 
 /*
@@ -90,18 +103,18 @@ func (dir Direction) OutboundAdjacency(cell *Cell) *Adjacency {
 }
 
 func (dir Direction) SetOutboundAdjacency(cell *Cell, adjacency *Adjacency) {
-    if dir == LEFT_TO_RIGHT {
-        cell.OutboundAdjacency[RIGHT] = adjacency
-    } else {
-        cell.OutboundAdjacency[LEFT] = adjacency
-    }
+	if dir == LEFT_TO_RIGHT {
+		cell.OutboundAdjacency[RIGHT] = adjacency
+	} else {
+		cell.OutboundAdjacency[LEFT] = adjacency
+	}
 }
 
 func (dir Direction) InboundAdjacencies(cell *Cell) AdjacencySet {
-    if dir == LEFT_TO_RIGHT {
-        return cell.InboundAdjacencies[LEFT]
-    }
-    return cell.InboundAdjacencies[RIGHT]
+	if dir == LEFT_TO_RIGHT {
+		return cell.InboundAdjacencies[LEFT]
+	}
+	return cell.InboundAdjacencies[RIGHT]
 }
 
 func (dir Direction) OutboundLinks(cell *Cell) *LinkList {
@@ -119,65 +132,65 @@ func (dir Direction) InboundLink(cell *Cell) *Link {
 }
 
 func (dir Direction) SetInboundLink(cell *Cell, link *Link) {
-    if dir == LEFT_TO_RIGHT {
-        invariant.IsNil(cell.InboundLink[LEFT])
-        cell.InboundLink[LEFT] = link
-    } else {
-        invariant.IsNil(cell.InboundLink[RIGHT])
-        cell.InboundLink[RIGHT] = link
-    }
+	if dir == LEFT_TO_RIGHT {
+		invariant.IsNil(cell.InboundLink[LEFT])
+		cell.InboundLink[LEFT] = link
+	} else {
+		invariant.IsNil(cell.InboundLink[RIGHT])
+		cell.InboundLink[RIGHT] = link
+	}
 }
 
 func (dir Direction) LastOutboundLinkD0(cell *Cell) *Link {
-    if dir == LEFT_TO_RIGHT {
-        return cell.LastOutboundLinkD0[RIGHT]
-    }
-    return cell.LastOutboundLinkD0[LEFT]
+	if dir == LEFT_TO_RIGHT {
+		return cell.LastOutboundLinkD0[RIGHT]
+	}
+	return cell.LastOutboundLinkD0[LEFT]
 }
 
 func (dir Direction) SetLastOutboundLinkD0(cell *Cell, link *Link) {
-    if dir == LEFT_TO_RIGHT {
-        cell.LastOutboundLinkD0[RIGHT] = link
-    } else {
-        cell.LastOutboundLinkD0[LEFT] = link
-    }
+	if dir == LEFT_TO_RIGHT {
+		cell.LastOutboundLinkD0[RIGHT] = link
+	} else {
+		cell.LastOutboundLinkD0[LEFT] = link
+	}
 }
 
 func (dir Direction) LastOutboundLinkD1(cell *Cell) *Link {
-    if dir == LEFT_TO_RIGHT {
-        return cell.LastOutboundLinkD1[RIGHT]
-    }
-    return cell.LastOutboundLinkD1[LEFT]
+	if dir == LEFT_TO_RIGHT {
+		return cell.LastOutboundLinkD1[RIGHT]
+	}
+	return cell.LastOutboundLinkD1[LEFT]
 }
 
 func (dir Direction) SetLastOutboundLinkD1(cell *Cell, link *Link) {
-    if dir == LEFT_TO_RIGHT {
-        cell.LastOutboundLinkD1[RIGHT] = link
-    } else {
-        cell.LastOutboundLinkD1[LEFT] = link
-    }
+	if dir == LEFT_TO_RIGHT {
+		cell.LastOutboundLinkD1[RIGHT] = link
+	} else {
+		cell.LastOutboundLinkD1[LEFT] = link
+	}
 }
 
 func (dir Direction) HasFullyBlockedAfter(cell *Cell) bool {
-    if dir == LEFT_TO_RIGHT {
-        return cell.FullyBlockedAfter[LEFT] != nil
-    }
-    return cell.FullyBlockedAfter[RIGHT] != nil
+	if dir == LEFT_TO_RIGHT {
+		return cell.FullyBlockedAfter[RIGHT] != nil
+	}
+	return cell.FullyBlockedAfter[LEFT] != nil
 }
 
 func (dir Direction) FullyBlockedAfter(cell *Cell) int {
-    if dir == LEFT_TO_RIGHT {
-        return *cell.FullyBlockedAfter[LEFT]
-    }
-    return *cell.FullyBlockedAfter[RIGHT]
+	if dir == LEFT_TO_RIGHT {
+		return *cell.FullyBlockedAfter[RIGHT]
+	}
+	return *cell.FullyBlockedAfter[LEFT]
 }
 
 func (dir Direction) SetFullyBlockedAfter(cell *Cell, index int) {
-    if dir == LEFT_TO_RIGHT {
-        cell.FullyBlockedAfter[LEFT] = &index
-    } else {
-        cell.FullyBlockedAfter[RIGHT] = &index
-    }
+	if dir == LEFT_TO_RIGHT {
+		cell.FullyBlockedAfter[RIGHT] = &index
+	} else {
+		cell.FullyBlockedAfter[LEFT] = &index
+	}
 }
 
 /*
@@ -207,18 +220,16 @@ func (dir Direction) PathEnd(cell *Cell) int {
 */
 
 func (dir Direction) Largest(a, b int) int {
-    if dir == LEFT_TO_RIGHT {
-        if a > b {
-            return a
-        }
-        return b
-    } else if b > a {
-        return a
-    }
-    return b
+	if dir == LEFT_TO_RIGHT {
+		if a > b {
+			return a
+		}
+		return b
+	} else if b > a {
+		return a
+	}
+	return b
 }
-
-
 
 /*
 func (dir Direction) EnumeratePaths(cell *Cell,

@@ -6,7 +6,7 @@ import (
 
 type Cell struct {
 	Index int
-	Token string
+	Token Token
 
 	// Marks the index of the closest cell which has an outbound d=1
 	// link, and also has a link-path back to this cell. Nil if there
@@ -35,7 +35,7 @@ type Cell struct {
 // due to the addition of a 2nd, 3rd, ... Nth outbound link from a cell.
 type BoxedCellPointer *Cell
 
-func NewCell(index int, token string) *Cell {
+func NewCell(index int, token Token) *Cell {
 	cell := new(Cell)
 	cell.Index = index
 	cell.Token = token
@@ -63,5 +63,5 @@ func (cell *Cell) D1LinkPathReaches(other *Cell) bool {
 		!forward.Less((*link.FurthestPath).Index, other.Index)
 }
 func (cell *Cell) LinkPathReaches(other *Cell) bool {
-    return cell.D0LinkPathReaches(other) || cell.D1LinkPathReaches(other)
+	return cell.D0LinkPathReaches(other) || cell.D1LinkPathReaches(other)
 }

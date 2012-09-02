@@ -1,216 +1,318 @@
 package chart
 
 import (
-	assert "invariant"
+	"fmt"
 	"testing"
 )
 
-// TODO: Clean up the structuring of the rest of these tests.
-
 // Use table-driven testing to verify expectations about
 // graph adjacency, covering, and link path post-conditions.
-type Expect struct {
-	index int
+type expect struct {
+	c *Cell
 
-	lAdj, rAdj           *Cell
-	lUnusable, rUnusable bool
+	// Must be declared in order of increasing absolute position.
+	lLinkOut, rLinkOut expectLinks
+	lAdjOut, rAdjOut   *Cell
 
+	// Link-path extents implicit from lLinkOut & rLinkOut
+	// don't need to be declared. Longer paths do.
 	lPathD0, lPathD1 *Cell
 	rPathD0, rPathD1 *Cell
+
+	// These are filled in implicitly by verify(), based
+	// on outgoing links & adjacencies of other cells.
+	linkIn        [2]*Cell
+	adjacenciesIn [2]map[*Cell]bool
 }
 
-func checkExpectations(t *testing.T, chart *Chart, expectations []Expect) {
-	checkLink := func(link *Link, expectedPath *Cell) {
-		if link == nil {
-			if expectedPath != nil {
-				t.Errorf("Have nil link but expected path to %v", expectedPath)
-			} else {
-				// Both are nil
+type expectLink struct {
+	depth uint
+	cell  *Cell
+}
+type expectLinks []expectLink
+
+func verify(t *testing.T, expectations ...expect) {
+
+	expectMap := make(map[*Cell]*expect)
+	for ind := range expectations {
+		expectMap[expectations[ind].c] = &expectations[ind]
+		expectations[ind].adjacenciesIn[0] = make(map[*Cell]bool)
+		expectations[ind].adjacenciesIn[1] = make(map[*Cell]bool)
+	}
+
+	// Pass 1: Verify declared outbound links, adjacencies, and
+	// link-paths. Collect implicit inbound links & adjacencies.
+	checkSideOut := func(cell *Cell, dir Direction,
+		eLinks expectLinks, eAdjacency, ePathD0, ePathD1 *Cell) {
+
+		linkCount := len(*dir.OutboundLinks(cell))
+		if len(eLinks) != linkCount {
+			t.Error("cell link arity mismatch ", cell, eLinks)
+			return
+		}
+
+		for i, eLink := range eLinks {
+			link := (*dir.OutboundLinks(cell))[i]
+
+			if link.Position != (i+1)*dir.PositionSign() ||
+				link.Depth != eLink.depth ||
+				link.To != eLink.cell {
+				t.Error("link mismatch ", link, eLink)
 			}
+			// Mark the expected inbound link.
+			expectMap[link.To].linkIn[dir.SideIn()] = cell
+		}
+
+		adjacency := dir.OutboundAdjacency(cell)
+		if adjacency.Position != (1+linkCount)*dir.PositionSign() ||
+			adjacency.To != eAdjacency {
+			t.Error("adjacency mismatch ", adjacency, eAdjacency)
+		}
+		if adjacency.To != nil {
+			if _, ok := expectMap[adjacency.To]; !ok {
+				t.Error("saw adjacency to cell w/o expect{} ", adjacency)
+				return
+			}
+			// Mark the expected inbound adjacency.
+			expectMap[adjacency.To].adjacenciesIn[dir.SideIn()][cell] = true
+		}
+
+		// Don't require trivial link-paths to be declared.
+		if l := dir.LastOutboundLinkD0(cell); ePathD0 == nil && l == nil {
+		} else if ePathD0 == nil && *l.FurthestPath == l.To {
+		} else if ePathD0 != nil && l != nil && *l.FurthestPath == ePathD0 {
 		} else {
-			if expectedPath == nil {
-				t.Errorf("Expected nil link, but have %v", link)
-			} else if *link.FurthestPath != expectedPath {
-				t.Errorf("Expected path to %v, not %v to path %v",
-					expectedPath, link, *link.FurthestPath)
+			t.Error("depth=0 link path mismatch ", ePathD0, l)
+		}
+
+		if l := dir.LastOutboundLinkD1(cell); ePathD1 == nil && l == nil {
+		} else if ePathD1 == nil && *l.FurthestPath == l.To {
+		} else if ePathD1 != nil && l != nil && *l.FurthestPath == ePathD1 {
+		} else {
+			t.Error("depth=1 link path mismatch ", ePathD1, l)
+		}
+	}
+
+	for cell, eCell := range expectMap {
+		checkSideOut(cell, LEFT_TO_RIGHT,
+			eCell.rLinkOut, eCell.rAdjOut, eCell.rPathD0, eCell.rPathD1)
+		checkSideOut(cell, RIGHT_TO_LEFT,
+			eCell.lLinkOut, eCell.lAdjOut, eCell.lPathD0, eCell.lPathD1)
+	}
+
+	// Pass 2: Verify inbound links & adjacencies implied by expectations.
+	checkSideIn := func(eCell *expect, dir Direction) {
+		eLink := eCell.linkIn[dir.SideIn()]
+		if link := dir.InboundLink(eCell.c); eLink == nil && link == nil {
+		} else if eLink != nil && link != nil && link.From == eLink {
+		} else {
+			t.Error("inbound link mismatch ", link, eLink)
+		}
+
+		eAdjacencies := eCell.adjacenciesIn[dir.SideIn()]
+		for adjacency := range dir.InboundAdjacencies(eCell.c) {
+			if !eAdjacencies[adjacency.From] {
+				t.Error("unexpected inbound adjacency ", eCell, adjacency)
 			}
+			delete(eAdjacencies, adjacency.From)
+		}
+		if len(eAdjacencies) != 0 {
+			t.Error("remaining unobserved inbound adjacencies ", eAdjacencies)
 		}
 	}
 
-	checkAdjacency := func(adj *Adjacency, cell *Cell, unusable bool) {
-		if adj.To != cell {
-			t.Errorf("Expected adjacency to %v, not %v", cell, adj)
-		}
-		if unusable && adj.RestrictedDepths() != RESTRICT_ALL {
-			t.Errorf("Expected unusable %v: %v", unusable, adj)
-		} else if !unusable && adj.RestrictedDepths() == RESTRICT_ALL {
-			t.Errorf("Expected unusable %v: %v", unusable, adj)
-		}
-	}
-
-	for _, e := range expectations {
-		cell := chart.Cells[e.index]
-
-		checkAdjacency(cell.OutboundAdjacency[LEFT], e.lAdj, e.lUnusable)
-		checkAdjacency(cell.OutboundAdjacency[RIGHT], e.rAdj, e.rUnusable)
-
-		checkLink(cell.LastOutboundLinkD0[LEFT], e.lPathD0)
-		checkLink(cell.LastOutboundLinkD1[LEFT], e.lPathD1)
-		checkLink(cell.LastOutboundLinkD0[RIGHT], e.rPathD0)
-		checkLink(cell.LastOutboundLinkD1[RIGHT], e.rPathD1)
+	for _, eCell := range expectMap {
+		checkSideIn(eCell, LEFT_TO_RIGHT)
+		checkSideIn(eCell, RIGHT_TO_LEFT)
 	}
 }
 
-func TestChart_AddCell(t *testing.T) {
+func TestChart_AdjacencyUpdate(t *testing.T) {
 	chart := NewChart()
-	W, X, Y := 0, 1, 2
+	chart.AddTokens("W", "X", "Y", "Z")
 
-	chart.AddCell("W")
-	assert.Equal(chart.Cells[W].OutboundAdjacency[LEFT].Position, -1)
-	assert.IsNil(chart.Cells[W].OutboundAdjacency[LEFT].To)
-	assert.Equal(chart.Cells[W].OutboundAdjacency[RIGHT].Position, 1)
-	assert.IsNil(chart.Cells[W].OutboundAdjacency[RIGHT].To)
-	assert.Equal(len(chart.Cells[W].InboundAdjacencies[LEFT]), 0)
-	assert.Equal(len(chart.Cells[W].InboundAdjacencies[RIGHT]), 0)
+	// With one cell, W's adjacent to {begin} and {end}.
+	W := chart.nextCell()
+	verify(t, expect{c: W})
 
 	// Adding a new cell updates W's right-side adjacency.
-	chart.AddCell("X")
-	assert.Equal(chart.Cells[W].OutboundAdjacency[RIGHT].To, chart.Cells[X])
-	assert.Equal(chart.Cells[X].OutboundAdjacency[LEFT].To, chart.Cells[W])
-	assert.Equal(len(chart.Cells[W].InboundAdjacencies[RIGHT]), 1)
-	assert.Equal(len(chart.Cells[X].InboundAdjacencies[LEFT]), 1)
+	X := chart.nextCell()
+	verify(t, expect{c: W, rAdjOut: X}, expect{c: X, lAdjOut: W})
 
-	// Both adjacencies are free to be used.
-	assert.IsFalse(chart.Cells[W].OutboundAdjacency[RIGHT].SpansPunctuation)
-	assert.IsFalse(chart.Cells[X].OutboundAdjacency[LEFT].SpansPunctuation)
+	// Use W & X's adjacencies, creating new ones.
+	chart.use(W.OutboundAdjacency[RIGHT], 0)
+	if a := W.OutboundAdjacency[RIGHT]; a.Position != 2 || a.To != nil {
+		t.Error("Expected a new adjacency to chart {end}")
+	}
+	chart.use(X.OutboundAdjacency[LEFT], 0)
+	if a := X.OutboundAdjacency[LEFT]; a.Position != -2 || a.To != nil {
+		t.Error("Expected a new adjacency to chart {begin}")
+	}
 
-	// Link W -0> X creates a new right adjacency of w.
-	chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 0)
+	// Adding Y updates X & W's {end} adjacencies.
+	Y := chart.nextCell()
+	verify(t,
+		expect{c: W, rLinkOut: expectLinks{{0, X}}, rAdjOut: Y},
+		expect{c: X, lLinkOut: expectLinks{{0, W}}, rAdjOut: Y},
+		expect{c: Y, lAdjOut: X})
 
-	// Punctionation immediately blocks adjacency to the next added cell.
-	chart.StoppingPunctuation()
+	Z := chart.nextCell()
+	chart.use(Z.OutboundAdjacency[LEFT], 0)
 
-	chart.AddCell("Y")
-	// Both X & Y have an adjacency to y.
-	assert.Equal(chart.Cells[W].OutboundAdjacency[RIGHT].To, chart.Cells[Y])
-	assert.Equal(chart.Cells[X].OutboundAdjacency[RIGHT].To, chart.Cells[Y])
-	assert.Equal(len(chart.Cells[Y].InboundAdjacencies[LEFT]), 2)
+	// Connectedness implies adding Z doesn't affect X & W's adjacencies.
+	verify(t,
+		expect{c: W, rLinkOut: expectLinks{{0, X}}, rAdjOut: Y},
+		expect{c: X, lLinkOut: expectLinks{{0, W}}, rAdjOut: Y},
+		expect{c: Y, lAdjOut: X, rAdjOut: Z},
+		expect{c: Z, lLinkOut: expectLinks{{0, Y}}, lAdjOut: X})
 
-	// But all adjacencies have stopping punctuation set.
-	assert.IsTrue(chart.Cells[W].OutboundAdjacency[RIGHT].SpansPunctuation)
-	assert.IsTrue(chart.Cells[X].OutboundAdjacency[RIGHT].SpansPunctuation)
-	assert.IsTrue(chart.Cells[Y].OutboundAdjacency[LEFT].SpansPunctuation)
+	if chart.nextCell() != nil {
+		t.Error("Should have run out of input")
+	}
+}
+
+func TestChart_StoppingPunctuation(t *testing.T) {
+	chart := NewChart()
+	chart.AddTokens("W", "X", ";", "Y", "Z")
+
+	W := chart.nextCell()
+	X := chart.nextCell()
+	chart.use(W.OutboundAdjacency[RIGHT], 0)
+
+	Y := chart.nextCell()
+	Z := chart.nextCell()
+	chart.use(Z.OutboundAdjacency[LEFT], 0)
+
+	// Punctuation is skipped when creating cells.
+	if chart.nextCell() != nil {
+		t.Error("Should have run out of input")
+	}
+
+	// Adjacencies are across stopping punctiation.
+	verify(t,
+		expect{c: W, rLinkOut: expectLinks{{0, X}}, rAdjOut: Y},
+		expect{c: X, lAdjOut: W, rAdjOut: Y},
+		expect{c: Y, lAdjOut: X, rAdjOut: Z},
+		expect{c: Z, lLinkOut: expectLinks{{0, Y}}, lAdjOut: X})
+
+	fmt.Print(chart)
+	// However, adjacencies spanning stopping punctuation are marked as such.
+	if !W.OutboundAdjacency[RIGHT].SpansPunctuation ||
+		!X.OutboundAdjacency[RIGHT].SpansPunctuation ||
+		!Y.OutboundAdjacency[LEFT].SpansPunctuation ||
+		!Z.OutboundAdjacency[LEFT].SpansPunctuation {
+		t.Error("expected adjacencies to span punctuation")
+	}
 }
 
 func TestChart_SimpleLinkPaths(t *testing.T) {
 	chart := NewChart()
-	W := chart.AddCell("W")
-	X := chart.AddCell("X")
-	Y := chart.AddCell("Y")
-	Z := chart.AddCell("Z")
+	chart.AddTokens("W", "X", "Y", "Z")
 
-	chart.Use(W.OutboundAdjacency[RIGHT], 1)
-	chart.Use(X.OutboundAdjacency[RIGHT], 0)
-	chart.Use(Y.OutboundAdjacency[LEFT], 0)
-	chart.Use(Z.OutboundAdjacency[LEFT], 1)
+	W := chart.nextCell()
+	X := chart.nextCell()
+	chart.use(W.OutboundAdjacency[RIGHT], 1)
 
-	expectations := []Expect{
-		//{index: W.Index, rAdj: Z, rPathD1: Y},
-		{index: X.Index, lAdj: W, rAdj: Z, rPathD0: Y},
-		//{index: Y.Index, lAdj: W, rAdj: Z, lPathD0: X},
-		//{index: Z.Index, lAdj: W, lPathD1: X},
-	}
-	checkExpectations(t, chart, expectations)
+	Y := chart.nextCell()
+	chart.use(X.OutboundAdjacency[RIGHT], 0)
+	chart.use(Y.OutboundAdjacency[LEFT], 0)
+
+	Z := chart.nextCell()
+	chart.use(Z.OutboundAdjacency[LEFT], 1)
+
+	verify(t,
+		expect{c: W, rLinkOut: expectLinks{{1, X}}, rAdjOut: Z, rPathD1: Y},
+		expect{c: X, rLinkOut: expectLinks{{0, Y}}, rAdjOut: Z, lAdjOut: W},
+		expect{c: Y, lLinkOut: expectLinks{{0, X}}, lAdjOut: W, rAdjOut: Z},
+		expect{c: Z, lLinkOut: expectLinks{{1, Y}}, lAdjOut: W, lPathD1: X})
 }
 
-func TestChart_LinkPathForward(t *testing.T) {
+func TestChart_BranchingLinkPathForward(t *testing.T) {
 	chart := NewChart()
-	V, W, X, Y, Z := 0, 1, 2, 3, 4
+	chart.AddTokens("V", "W", "X", "Y", "Z")
 
-	chart.AddCell("V")
-	chart.AddCell("W")
-	chart.Use(chart.Cells[V].OutboundAdjacency[RIGHT], 0)
+	V := chart.nextCell()
+	W := chart.nextCell()
+	chart.use(V.OutboundAdjacency[RIGHT], 0)
 
-	chart.AddCell("X")
-	chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 0)
+	X := chart.nextCell()
+	chart.use(W.OutboundAdjacency[RIGHT], 0)
 
-	chart.AddCell("Y")
-	chart.Use(chart.Cells[X].OutboundAdjacency[RIGHT], 0)
+	Y := chart.nextCell()
+	chart.use(X.OutboundAdjacency[RIGHT], 0)
 
-	chart.AddCell("Z")
-	chart.Use(chart.Cells[W].OutboundAdjacency[RIGHT], 1)
+	Z := chart.nextCell()
+	chart.use(W.OutboundAdjacency[RIGHT], 1)
 
-	c := chart.Cells
-	expectations := []Expect{
-		{index: V, rPathD0: c[Z]},
-		{index: W, lAdj: c[V], rPathD0: c[Y], rPathD1: c[Z]},
-		{index: X, lAdj: c[W], rAdj: c[Z], rUnusable: true, rPathD0: c[Y]},
-		{index: Y, lAdj: c[X], rAdj: c[Z], rUnusable: true},
-		{index: Z, lAdj: c[Y]},
-	}
-	checkExpectations(t, chart, expectations)
+	verify(t,
+		expect{c: V, rLinkOut: expectLinks{{0, W}}, rPathD0: Z},
+		expect{c: W, rLinkOut: expectLinks{{0, X}, {1, Z}},
+			rPathD0: Y, rPathD1: Z, lAdjOut: V},
+		expect{c: X, rLinkOut: expectLinks{{0, Y}}, lAdjOut: W, rAdjOut: Z},
+		expect{c: Y, lAdjOut: X, rAdjOut: Z},
+		expect{c: Z, lAdjOut: Y})
 }
 
-func TestChart_LinkPathBackward(t *testing.T) {
+func TestChart_BranchingLinkPathBackward(t *testing.T) {
 	chart := NewChart()
-	V, W, X, Y, Z := 0, 1, 2, 3, 4
+	chart.AddTokens("V", "W", "X", "Y", "Z")
 
-	chart.AddCell("V")
-	chart.AddCell("W")
-	chart.AddCell("X")
-	chart.Use(chart.Cells[X].OutboundAdjacency[LEFT], 0)
+	V := chart.nextCell()
+	W := chart.nextCell()
+	X := chart.nextCell()
+	chart.use(X.OutboundAdjacency[LEFT], 0)
 
-	chart.AddCell("Y")
-	chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 0)
-	chart.Use(chart.Cells[Y].OutboundAdjacency[LEFT], 1)
+	Y := chart.nextCell()
+	chart.use(Y.OutboundAdjacency[LEFT], 0)
+	chart.use(Y.OutboundAdjacency[LEFT], 1)
 
-	chart.AddCell("Z")
-	chart.Use(chart.Cells[Z].OutboundAdjacency[LEFT], 0)
+	Z := chart.nextCell()
+	chart.use(Z.OutboundAdjacency[LEFT], 0)
 
-	c := chart.Cells
-	expectations := []Expect{
-		{index: V, rAdj: c[W]},
-		{index: W, lAdj: c[V], lUnusable: true, rAdj: c[X]},
-		{index: X, lAdj: c[V], lUnusable: true, rAdj: c[Y], lPathD0: c[W]},
-		{index: Y, rAdj: c[Z], lPathD0: c[W], lPathD1: c[V]},
-		{index: Z, lPathD0: c[V]},
-	}
-	checkExpectations(t, chart, expectations)
+	verify(t,
+		expect{c: V, rAdjOut: W},
+		expect{c: W, lAdjOut: V, rAdjOut: X},
+		expect{c: X, lLinkOut: expectLinks{{0, W}}, lAdjOut: V, rAdjOut: Y},
+		expect{c: Y, lLinkOut: expectLinks{{0, X}, {1, V}},
+			lPathD0: W, lPathD1: V, rAdjOut: Z},
+		expect{c: Z, lLinkOut: expectLinks{{0, Y}}, lPathD0: V})
 }
 
-func TestChart_UseExtended(t *testing.T) {
+func TestChart_CoveredAdjacencies(t *testing.T) {
 	chart := NewChart()
-	T := chart.AddCell("T")
-	U := chart.AddCell("U")
-	V := chart.AddCell("V")
-	W := chart.AddCell("W")
-	X := chart.AddCell("X")
-	Y := chart.AddCell("Y")
-	Z := chart.AddCell("Z")
+	chart.AddTokens("W", "X", "Y", "Z")
 
-	// Manually build up a parse structure, which excercises
-	// multiple link depths, covering links, and link paths.
-	chart.Use(T.OutboundAdjacency[RIGHT], 0)
-	chart.Use(U.OutboundAdjacency[RIGHT], 0)
-	chart.Use(V.OutboundAdjacency[LEFT], 0)
-	chart.Use(V.OutboundAdjacency[RIGHT], 0)
-	chart.Use(U.OutboundAdjacency[RIGHT], 1)
-	chart.Use(Y.OutboundAdjacency[LEFT], 0)
-	chart.Use(Y.OutboundAdjacency[LEFT], 0)
-	chart.Use(Y.OutboundAdjacency[LEFT], 0)
-	chart.Use(Y.OutboundAdjacency[LEFT], 1)
-	chart.Use(Y.OutboundAdjacency[RIGHT], 1)
+	W := chart.nextCell()
+	X := chart.nextCell()
+	chart.use(W.OutboundAdjacency[RIGHT], 0)
 
-	expectations := []Expect{
-		{index: T.Index, rAdj: Y, rPathD0: X},
-		{index: U.Index, lAdj: T, lUnusable: true, rAdj: Y, rUnusable: true,
-			rPathD0: W, rPathD1: X},
-		{index: V.Index, lAdj: T, lUnusable: true, rAdj: X, rUnusable: true,
-			lPathD0: U, rPathD0: W},
-		{index: W.Index, lAdj: V, lUnusable: true, rAdj: X, rUnusable: true},
-		{index: X.Index, lAdj: W, lUnusable: true, rAdj: Y},
-		{index: Y.Index, lPathD0: U, lPathD1: T, rPathD1: Z},
-		{index: Z.Index, lAdj: Y},
+	Y := chart.nextCell()
+	if a := X.OutboundAdjacency[RIGHT]; a.To != Y || a.CoveredByLink {
+		t.Error("expected non-covered adjacency X => Y ", a)
 	}
-	checkExpectations(t, chart, expectations)
+
+	// Use of W => Y covers the X => Y adjacency. It isn't moved.
+	chart.use(W.OutboundAdjacency[RIGHT], 0)
+	if a := X.OutboundAdjacency[RIGHT]; a.To != Y || !a.CoveredByLink {
+		t.Error("expected covered adjacency X => Y ", a)
+	}
+
+	Z := chart.nextCell()
+	chart.use(Z.OutboundAdjacency[LEFT], 0)
+
+	if a := Y.OutboundAdjacency[LEFT]; a.To != X || a.CoveredByLink {
+		t.Error("expected non-covered adjacency Y => X", a)
+	}
+
+	// Use of Z => X covers the Y => X adjacency. It isn't moved.
+	chart.use(Z.OutboundAdjacency[LEFT], 0)
+	if a := Y.OutboundAdjacency[LEFT]; a.To != X || !a.CoveredByLink {
+		t.Error("expected non-covered adjacency Y => X", a)
+	}
+
+	verify(t,
+		expect{c: W, rLinkOut: expectLinks{{0, X}, {0, Y}}, rAdjOut: Z},
+		expect{c: X, lAdjOut: W, rAdjOut: Y},
+		expect{c: Y, lAdjOut: X, rAdjOut: Z},
+		expect{c: Z, lLinkOut: expectLinks{{0, Y}, {0, X}}, lAdjOut: W})
 }

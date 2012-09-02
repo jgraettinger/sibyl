@@ -4,25 +4,23 @@ import (
 	"testing"
 )
 
-func checkMontonicity(t *testing.T, adjacency *Adjacency,
-	expect DepthRestriction) {
-
-	if r := adjacency.MontonicityRestriction(); r != expect {
+func checkMontonicity(t *testing.T, adjacency *Adjacency, e DepthRestriction) {
+	if r := adjacency.MontonicityRestriction(); r != e {
 		t.Errorf("Expected montonicity %v on %v, but got %v",
-			expect, adjacency, r)
+			e, adjacency, r)
 	}
 }
 
 func TestMontonicity(t *testing.T) {
 	chart := NewChart()
-	Y := chart.AddCell("Y")
-	Z := chart.AddCell("Z")
+	chart.AddTokens("Y", "Z")
 
+	Y, Z := chart.nextCell(), chart.nextCell()
 	checkMontonicity(t, Y.OutboundAdjacency[RIGHT], RESTRICT_NONE)
 	checkMontonicity(t, Z.OutboundAdjacency[LEFT], RESTRICT_NONE)
 
-	chart.Use(Y.OutboundAdjacency[RIGHT], 1)
-	chart.Use(Z.OutboundAdjacency[LEFT], 1)
+	chart.use(Y.OutboundAdjacency[RIGHT], 1)
+	chart.use(Z.OutboundAdjacency[LEFT], 1)
 
 	// Outbound adjacencies created through linking have depth 0 blocked.
 	checkMontonicity(t, Y.OutboundAdjacency[RIGHT], RESTRICT_D0)

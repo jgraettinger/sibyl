@@ -28,12 +28,14 @@ type Adjacency struct {
 	CoveredByLink bool
 }
 
-func (adjacency *Adjacency) RestrictedDepths() (restrict DepthRestriction) {
+func (adjacency *Adjacency) RestrictedDepths(chart *Chart) (
+	restrict DepthRestriction) {
 	restrict |= adjacency.PunctuationRestriction()
 	restrict |= adjacency.CoveredLinkRestriction()
 	restrict |= adjacency.MontonicityRestriction()
 	restrict |= adjacency.BlockingRestriction()
 	restrict |= adjacency.EqualityRestriction()
+	restrict |= adjacency.ResolutionRestriction(chart)
 	return
 }
 
@@ -110,5 +112,5 @@ func (restrict DepthRestriction) Allows(depth uint) bool {
 	if depth == 0 {
 		return restrict&RESTRICT_D0 == 0
 	}
-    return restrict&RESTRICT_D1 == 0
+	return restrict&RESTRICT_D1 == 0
 }

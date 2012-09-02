@@ -1,11 +1,12 @@
 package chart
 
-func IsStoppingPunctuaction(token string) bool {
+type Token string
 
-    switch token {
-    case ",", ".", ";", ":", "--":
-        return true
-    }
-    return false
+func (token Token) IsStoppingPunctuaction() bool {
+
+	switch token {
+	case ",", ".", ";", ":", "--":
+		return true
+	}
+	return false
 }
-

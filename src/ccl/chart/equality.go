@@ -35,7 +35,7 @@ func (adjacency *Adjacency) EqualityRestriction() (restrict DepthRestriction) {
 		// If adjacency.To has a link-path to backLink.From, than the partial
 		// blocking restriction constrains backLink to d=1.
 		invariant.IsTrue(backLink.Depth == 1)
-	    restrict = RESTRICT_D0
+		restrict = RESTRICT_D0
 	}
 	invariant.IsFalse(restrict == RESTRICT_ALL)
 	return

@@ -57,7 +57,7 @@ func (link *Link) ForkFurthestPath() *BoxedCellPointer {
 	for next != nil {
 		// Replace the boxed path instance along this link path
 		next.FurthestPath = newPath
-        next = forward.OutboundLinks(next.To).Last()
+		next = forward.OutboundLinks(next.To).Last()
 	}
 	return oldPath
 }

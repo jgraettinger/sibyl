@@ -18,7 +18,7 @@ func (adjacency *Adjacency) BlockingRestriction() (restrict DepthRestriction) {
 	// Spanning a d=1 link of a cell having a path back to From, blocks all.
 	if forward.HasFullyBlockedAfter(adjacency.From) {
 		bound := forward.FullyBlockedAfter(adjacency.From)
-		if forward.Less(bound, adjacency.To.Index) {
+		if adjacency.To == nil || forward.Less(bound, adjacency.To.Index) {
 			log.Printf("Block-bound of %v fully blocks", bound)
 			restrict |= RESTRICT_ALL
 		}
