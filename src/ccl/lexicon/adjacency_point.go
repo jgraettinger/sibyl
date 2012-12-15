@@ -1,5 +1,5 @@
-package cclparse
-/*
+package lexicon
+
 import (
 	"encoding/json"
 	"fmt"
@@ -231,4 +231,4 @@ func (labelWeights LabelWeights) MarshalJSON() (result []byte, err error) {
 	result, err = json.Marshal(stringWeights)
 	return
 }
-*/
+

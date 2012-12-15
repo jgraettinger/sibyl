@@ -30,7 +30,10 @@ func (chart *Chart) AddTokens(tokens ...Token) {
 	chart.nextTokens = append(chart.nextTokens, tokens...)
 }
 
-func (chart *Chart) nextCell() *Cell {
+func (chart *Chart) NextCell() *Cell {
+	// Resolution violations must be resolved before moving to the next cell.
+	invariant.IsNil(chart.minimalViolation)
+
 	var stoppingPunc bool
 	var token Token
 
@@ -64,11 +67,8 @@ func (chart *Chart) nextCell() *Cell {
 	for adjacency := range chart.endInbound {
 		delete(chart.endInbound, adjacency)
 
-		if stoppingPunc {
-			adjacency.SpansPunctuation = true
-		}
-
 		adjacency.To = nextCell
+		adjacency.SpansPunctuation = stoppingPunc
 		nextCell.InboundAdjacencies[LEFT].Add(adjacency)
 	}
 
@@ -77,10 +77,7 @@ func (chart *Chart) nextCell() *Cell {
 	adjacency.From = nextCell
 	adjacency.To = prevCell
 	adjacency.Position = -1
-
-	if stoppingPunc {
-		adjacency.SpansPunctuation = true
-	}
+	adjacency.SpansPunctuation = stoppingPunc
 
 	nextCell.OutboundAdjacency[LEFT] = adjacency
 	if prevCell != nil {
@@ -96,6 +93,8 @@ func (chart *Chart) nextCell() *Cell {
 
 	nextCell.OutboundAdjacency[RIGHT] = adjacency
 	chart.endInbound.Add(adjacency)
+
+	log.Printf("Stepped to next cell %v", nextCell)
 	return nextCell
 }
 
@@ -106,7 +105,7 @@ func (chart *Chart) CurrentCell() *Cell {
 	return nil
 }
 
-func (chart *Chart) use(adjacency *Adjacency, depth uint) {
+func (chart *Chart) Use(adjacency *Adjacency, depth uint) {
 	// Used adjacencies must be From or To the current (last) cell.
 	{
 		invariant.NotNil(adjacency.To)
@@ -114,7 +113,8 @@ func (chart *Chart) use(adjacency *Adjacency, depth uint) {
 		cell := chart.CurrentCell()
 		invariant.IsTrue(adjacency.From == cell || adjacency.To == cell)
 		invariant.IsTrue(chart.minimalViolation == nil ||
-			adjacency.From == cell || adjacency.From == chart.minimalViolation)
+			adjacency.From == cell ||
+			adjacency.From == chart.minimalViolation)
 	}
 
 	forward := DirectionFromPosition(adjacency.Position)
@@ -227,6 +227,75 @@ func (chart *Chart) use(adjacency *Adjacency, depth uint) {
 	}
 	updateBlocking(chart, link)
 	updateResolution(chart, link)
+	return
+}
+
+func (chart *Chart) BestAdjacency(scorer Scorer) (
+	bestAdjacency *Adjacency, bestDepth uint, bestScore float64) {
+	if len(chart.Cells) < 2 {
+		return
+	}
+
+	check := func(adjacency *Adjacency) {
+		restriction := adjacency.RestrictedDepths(chart)
+		score, depth := scorer.Score(adjacency)
+
+		log.Printf("Adjacency %s has score %v depth %v and restriction %v\n",
+			adjacency, score, depth, restriction)
+
+		if bestAdjacency == nil || score > bestScore {
+			if restriction&RESTRICT_D0 != 0 && depth == 0 {
+				depth = 1
+			}
+			if restriction&RESTRICT_D1 != 0 && depth == 1 {
+				return
+			}
+			bestScore = score
+			bestDepth = depth
+			bestAdjacency = adjacency
+		}
+	}
+
+	if chart.minimalViolation != nil {
+		log.Printf("Considering adjacencies in resolution-violation mode")
+		// Only two adjacencies may be considered, and one must be selected:
+		// * The adjacency from the minimalViolation to the current cell.
+		// * The adjacency from the current cell back towards the violation.
+		check(chart.minimalViolation.OutboundAdjacency[RIGHT])
+		check(chart.CurrentCell().OutboundAdjacency[LEFT])
+
+		invariant.NotNil(bestAdjacency)
+		return
+	}
+
+	index := len(chart.Cells) - 1
+
+	// Prefer direct adjacency between the last & second-to-last
+	// cells, if either of these adjacencies has positive weight
+	// Due to the incremental nature of parsing, this is sufficient
+	// to satisfy the general preference for direct adjacency,
+	// as any other linkable direct adjacencies have already been linked.
+	if adjacency := chart.Cells[index-1].OutboundAdjacency[RIGHT]; adjacency.Position == 1 {
+		check(adjacency)
+	}
+	if adjacency := chart.Cells[index].OutboundAdjacency[LEFT]; adjacency.Position == -1 {
+		check(adjacency)
+	}
+
+	if bestScore != 0 {
+		return
+	}
+
+	// Check all inbound adjacencies to the last cell.
+	for adjacency := range chart.Cells[index].InboundAdjacencies[LEFT] {
+		check(adjacency)
+	}
+	// Check outbound adjacency from the last cell.
+	check(chart.Cells[index].OutboundAdjacency[LEFT])
+
+	if bestScore == 0 {
+		bestAdjacency = nil
+	}
 	return
 }
 

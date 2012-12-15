@@ -1,27 +1,26 @@
-package cclparse
+package lexicon
 
 import (
-	//"invariant"
-    "fmt"
+	"fmt"
 )
 
 type LabelType uint8
 
 const (
-    CLASS LabelType = 0
-    ADJACENCY LabelType = 1
+	CLASS     LabelType = 0
+	ADJACENCY LabelType = 1
 )
 
 type Label struct {
-    Type LabelType
+	Type  LabelType
 	Token string
 }
 
 func (label Label) Flip() Label {
 	if label.Type == CLASS {
 		return Label{ADJACENCY, label.Token}
-    }
-    return Label{CLASS, label.Token}
+	}
+	return Label{CLASS, label.Token}
 }
 
 func (label Label) IsClass() bool {
@@ -33,9 +32,8 @@ func (label Label) IsAdjacency() bool {
 }
 
 func (label Label) String() string {
-    if label.IsClass() {
-        return fmt.Sprintf("%v", label.Token)
-    }
-    return fmt.Sprintf(".%v", label.Token)
+	if label.IsClass() {
+		return fmt.Sprintf("%v", label.Token)
+	}
+	return fmt.Sprintf(".%v", label.Token)
 }
-

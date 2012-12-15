@@ -1,20 +1,46 @@
-package cclparse
-/*
+package lexicon
+
 import (
+	"ccl/chart"
 	"invariant"
 	"strings"
-    "ccl/parse"
 )
-
 
 type Lexicon map[AdjacencyPoint]*AdjacencyStatistics
 
-func NewLexicon() Lexicon {
+func New() Lexicon {
 	return make(Lexicon)
 }
 
+func (lexicon Lexicon) Score(adjacency *chart.Adjacency) (
+	linkWeight float64, linkDepth uint) {
+
+	if adjacency.To == nil {
+		// empty adjacency
+		return
+	}
+
+	yIn := lexicon[AdjacencyPoint{string(adjacency.To.Token),
+		-isign(adjacency.Position)}]
+	if yIn == nil {
+		return
+	}
+
+	// check each adjacency point of From, starting at the adjacency
+	//  position and working backwards to position 1
+	position := adjacency.Position
+	for ; linkWeight == 0 && position != 0; position -= isign(position) {
+		xOut := lexicon[AdjacencyPoint{string(adjacency.From.Token), position}]
+		if xOut == nil {
+			continue
+		}
+		linkWeight, linkDepth = lexicon.linkWeight(xOut, yIn)
+	}
+	return
+}
+
 func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics) (
-	linkWeight float64, linkDepth uint8) {
+	linkWeight float64, linkDepth uint) {
 
 	invariant.NotNil(xOut)
 	invariant.NotNil(yIn)
@@ -68,51 +94,30 @@ func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics) (
 	return
 }
 
-func (lexicon Lexicon) Score(adjacency *parse.Adjacency) (
-	linkWeight float64, linkDepth uint8) {
-
-	if adjacency.To == nil {
-		// empty adjacency
-		return
-	}
-
-	yIn := lexicon[AdjacencyPoint{adjacency.To.Token,
-		-isign(adjacency.Position)}]
-	if yIn == nil {
-		return
-	}
-
-	// check each adjacency point of From, starting at the adjacency
-	//  position and working backwards to position 1
-	position := adjacency.Position
-	for ; linkWeight == 0 && position != 0; position -= isign(position) {
-
-		xOut := lexicon[AdjacencyPoint{adjacency.From.Token, position}]
-		if xOut == nil {
-			continue
-		}
-		linkWeight, linkDepth = lexicon.linkWeight(xOut, yIn)
-	}
-	return
-}
-
-func (lexicon Lexicon) Learn(chart *parse.Chart) {
-
+func (lexicon Lexicon) Learn(ch *chart.Chart) {
 	var deltas []*AdjacencyStatistics
 
 	// Closure which adds to 'deltas' the appropriate
 	// lexicon update for an argument Adjacency.
-	update := func(adjacency *Adjacency) {
+	updateFromAdjacency := func(adjacency *chart.Adjacency) {
 
-		point := AdjacencyPoint{adjacency.From.Token, adjacency.Position}
+		point := AdjacencyPoint{adjacency.From.Token.Str(), adjacency.Position}
 		delta := NewAdjacencyStatistics(point)
 
-		if adjacency.To == nil || adjacency.StoppingPunc {
+		if adjacency.To == nil ||
+			adjacency.RestrictedDepths(ch) == chart.RESTRICT_ALL {
 			delta.updateFromBlocking()
 		} else {
-			delta.update(lexicon, adjacency.To.Token)
+			delta.update(lexicon, adjacency.To.Token.Str())
 		}
+		deltas = append(deltas, delta)
+	}
 
+	updateFromLink := func(link *chart.Link) {
+		point := AdjacencyPoint{link.From.Token.Str(), link.Position}
+		delta := NewAdjacencyStatistics(point)
+
+		delta.update(lexicon, link.To.Token.Str())
 		deltas = append(deltas, delta)
 	}
 
@@ -120,20 +125,16 @@ func (lexicon Lexicon) Learn(chart *parse.Chart) {
 	// of every cell in the chart. By computing deltas rather
 	// than directly updating the lexicon, we isolate updates
 	// from early cells from affecting updates from later ones.
-	for _, cell := range chart.cells {
-		for _, adjacency := range cell.Outbound[LEFT] {
+	for _, cell := range ch.Cells {
 
-			// TODO HACK : I don't think this should be here. To match cclparse behavior
-			if !adjacency.Used && adjacency.Position <= -2 && adjacency.To != nil {
-				if _, okay := lexicon[AdjacencyPoint{adjacency.To.Token, 1}]; !okay {
-					continue
-				}
-			}
+		updateFromAdjacency(cell.OutboundAdjacency[chart.LEFT])
+		updateFromAdjacency(cell.OutboundAdjacency[chart.RIGHT])
 
-			update(adjacency)
+		for _, link := range cell.OutboundLinks[chart.LEFT] {
+			updateFromLink(link)
 		}
-		for _, adjacency := range cell.Outbound[RIGHT] {
-			update(adjacency)
+		for _, link := range cell.OutboundLinks[chart.RIGHT] {
+			updateFromLink(link)
 		}
 	}
 	// Fold each delta into the lexicon.
@@ -153,4 +154,32 @@ func (this Lexicon) String() string {
 	}
 	return strings.Join(parts, "\n")
 }
-*/
+
+func isign(a int) int {
+	invariant.NotEqual(a, 0)
+	if a < 0 {
+		return -1
+	}
+	return 1
+}
+
+func fmin(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func fabs(a float64) float64 {
+	if a < 0 {
+		return -a
+	}
+	return a
+}
+
+func iabs(a int) int {
+	if a < 0 {
+		return -a
+	}
+	return a
+}

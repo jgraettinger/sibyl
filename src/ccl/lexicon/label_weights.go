@@ -1,4 +1,4 @@
-package cclparse
+package lexicon
 
 import (
     "sort"
@@ -27,7 +27,6 @@ func (list LabelWeightsList) Swap(i, j int) {
 }
 
 func (weights LabelWeights) FilterToTopN(count int) LabelWeights {
-
     var list LabelWeightsList
 
     for label, weight := range(weights) {

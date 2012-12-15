@@ -54,8 +54,6 @@ func (fixtures ParseFixtures) AddBlocked(from, to string) *AdjacencyFixture {
     return fixture
 }
 
-
-
 func (fixtures ParseFixtures) AddNotAdjacent(
     from, to string) *AdjacencyFixture {
 
@@ -70,7 +68,6 @@ func (fixtures ParseFixtures) AddNotAdjacent(
     fixtures[fixture.AdjacencyFixtureKey] = fixture
     return fixture
 }
-
 
 // ParseFixtures conforms to Scorer interface
 func (fixtures ParseFixtures) Score(adjacency *Adjacency) (float64, uint) {

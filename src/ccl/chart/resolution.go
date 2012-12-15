@@ -28,7 +28,8 @@ func updateResolutionLeftToRight(chart *Chart, link *Link) {
 }
 
 func updateResolutionRightToLeft(chart *Chart, link *Link) {
-	if link.To == chart.minimalViolation {
+	if chart.minimalViolation != nil && 
+		(*link.FurthestPath).Index <= chart.minimalViolation.Index {
 		// This link resolves an earlier resolution violation,
 		// as the triggering left-to-right path has been covered.
 		log.Printf("left-link %v resolves minimal violation %v",
@@ -39,7 +40,8 @@ func updateResolutionRightToLeft(chart *Chart, link *Link) {
 	// Determine whether this link has created a new violation.
 	// Look for a backwards inbound link into the furthest cell reachable
 	// along this link path.
-	if inbound := LEFT_TO_RIGHT.InboundLink(*link.FurthestPath); inbound != nil {
+	if inbound := LEFT_TO_RIGHT.InboundLink(*link.FurthestPath);
+		inbound != nil {
 
 		if cell := inbound.From; !cell.LinkPathReaches(link.From) {
 			// This is a resolution violation. inbound.From & Link.From each

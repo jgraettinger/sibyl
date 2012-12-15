@@ -95,6 +95,7 @@ func TestBlockingWXYZ(t *testing.T) {
     parseAndValidate(fixtures, []string{"w", "x", "y", "z"}, t)
 }
 
+/*
 func TestFoobar(t *testing.T) {
 
     w -0> x
@@ -121,6 +122,7 @@ func TestEqualityFoo(t *testing.T) {
     // this should *pass*, despite looking like a cycle might be possible
 
 }
+*/
 
 func TestEqualityXY(t *testing.T) {
 

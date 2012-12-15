@@ -132,32 +132,32 @@ func TestChart_AdjacencyUpdate(t *testing.T) {
 	chart.AddTokens("W", "X", "Y", "Z")
 
 	// With one cell, W's adjacent to {begin} and {end}.
-	W := chart.nextCell()
+	W := chart.NextCell()
 	verify(t, expect{c: W})
 
 	// Adding a new cell updates W's right-side adjacency.
-	X := chart.nextCell()
+	X := chart.NextCell()
 	verify(t, expect{c: W, rAdjOut: X}, expect{c: X, lAdjOut: W})
 
 	// Use W & X's adjacencies, creating new ones.
-	chart.use(W.OutboundAdjacency[RIGHT], 0)
+	chart.Use(W.OutboundAdjacency[RIGHT], 0)
 	if a := W.OutboundAdjacency[RIGHT]; a.Position != 2 || a.To != nil {
 		t.Error("Expected a new adjacency to chart {end}")
 	}
-	chart.use(X.OutboundAdjacency[LEFT], 0)
+	chart.Use(X.OutboundAdjacency[LEFT], 0)
 	if a := X.OutboundAdjacency[LEFT]; a.Position != -2 || a.To != nil {
 		t.Error("Expected a new adjacency to chart {begin}")
 	}
 
 	// Adding Y updates X & W's {end} adjacencies.
-	Y := chart.nextCell()
+	Y := chart.NextCell()
 	verify(t,
 		expect{c: W, rLinkOut: expectLinks{{0, X}}, rAdjOut: Y},
 		expect{c: X, lLinkOut: expectLinks{{0, W}}, rAdjOut: Y},
 		expect{c: Y, lAdjOut: X})
 
-	Z := chart.nextCell()
-	chart.use(Z.OutboundAdjacency[LEFT], 0)
+	Z := chart.NextCell()
+	chart.Use(Z.OutboundAdjacency[LEFT], 0)
 
 	// Connectedness implies adding Z doesn't affect X & W's adjacencies.
 	verify(t,
@@ -166,7 +166,7 @@ func TestChart_AdjacencyUpdate(t *testing.T) {
 		expect{c: Y, lAdjOut: X, rAdjOut: Z},
 		expect{c: Z, lLinkOut: expectLinks{{0, Y}}, lAdjOut: X})
 
-	if chart.nextCell() != nil {
+	if chart.NextCell() != nil {
 		t.Error("Should have run out of input")
 	}
 }
@@ -175,16 +175,16 @@ func TestChart_StoppingPunctuation(t *testing.T) {
 	chart := NewChart()
 	chart.AddTokens("W", "X", ";", "Y", "Z")
 
-	W := chart.nextCell()
-	X := chart.nextCell()
-	chart.use(W.OutboundAdjacency[RIGHT], 0)
+	W := chart.NextCell()
+	X := chart.NextCell()
+	chart.Use(W.OutboundAdjacency[RIGHT], 0)
 
-	Y := chart.nextCell()
-	Z := chart.nextCell()
-	chart.use(Z.OutboundAdjacency[LEFT], 0)
+	Y := chart.NextCell()
+	Z := chart.NextCell()
+	chart.Use(Z.OutboundAdjacency[LEFT], 0)
 
 	// Punctuation is skipped when creating cells.
-	if chart.nextCell() != nil {
+	if chart.NextCell() != nil {
 		t.Error("Should have run out of input")
 	}
 
@@ -209,16 +209,16 @@ func TestChart_SimpleLinkPaths(t *testing.T) {
 	chart := NewChart()
 	chart.AddTokens("W", "X", "Y", "Z")
 
-	W := chart.nextCell()
-	X := chart.nextCell()
-	chart.use(W.OutboundAdjacency[RIGHT], 1)
+	W := chart.NextCell()
+	X := chart.NextCell()
+	chart.Use(W.OutboundAdjacency[RIGHT], 1)
 
-	Y := chart.nextCell()
-	chart.use(X.OutboundAdjacency[RIGHT], 0)
-	chart.use(Y.OutboundAdjacency[LEFT], 0)
+	Y := chart.NextCell()
+	chart.Use(X.OutboundAdjacency[RIGHT], 0)
+	chart.Use(Y.OutboundAdjacency[LEFT], 0)
 
-	Z := chart.nextCell()
-	chart.use(Z.OutboundAdjacency[LEFT], 1)
+	Z := chart.NextCell()
+	chart.Use(Z.OutboundAdjacency[LEFT], 1)
 
 	verify(t,
 		expect{c: W, rLinkOut: expectLinks{{1, X}}, rAdjOut: Z, rPathD1: Y},
@@ -231,18 +231,18 @@ func TestChart_BranchingLinkPathForward(t *testing.T) {
 	chart := NewChart()
 	chart.AddTokens("V", "W", "X", "Y", "Z")
 
-	V := chart.nextCell()
-	W := chart.nextCell()
-	chart.use(V.OutboundAdjacency[RIGHT], 0)
+	V := chart.NextCell()
+	W := chart.NextCell()
+	chart.Use(V.OutboundAdjacency[RIGHT], 0)
 
-	X := chart.nextCell()
-	chart.use(W.OutboundAdjacency[RIGHT], 0)
+	X := chart.NextCell()
+	chart.Use(W.OutboundAdjacency[RIGHT], 0)
 
-	Y := chart.nextCell()
-	chart.use(X.OutboundAdjacency[RIGHT], 0)
+	Y := chart.NextCell()
+	chart.Use(X.OutboundAdjacency[RIGHT], 0)
 
-	Z := chart.nextCell()
-	chart.use(W.OutboundAdjacency[RIGHT], 1)
+	Z := chart.NextCell()
+	chart.Use(W.OutboundAdjacency[RIGHT], 1)
 
 	verify(t,
 		expect{c: V, rLinkOut: expectLinks{{0, W}}, rPathD0: Z},
@@ -257,17 +257,17 @@ func TestChart_BranchingLinkPathBackward(t *testing.T) {
 	chart := NewChart()
 	chart.AddTokens("V", "W", "X", "Y", "Z")
 
-	V := chart.nextCell()
-	W := chart.nextCell()
-	X := chart.nextCell()
-	chart.use(X.OutboundAdjacency[LEFT], 0)
+	V := chart.NextCell()
+	W := chart.NextCell()
+	X := chart.NextCell()
+	chart.Use(X.OutboundAdjacency[LEFT], 0)
 
-	Y := chart.nextCell()
-	chart.use(Y.OutboundAdjacency[LEFT], 0)
-	chart.use(Y.OutboundAdjacency[LEFT], 1)
+	Y := chart.NextCell()
+	chart.Use(Y.OutboundAdjacency[LEFT], 0)
+	chart.Use(Y.OutboundAdjacency[LEFT], 1)
 
-	Z := chart.nextCell()
-	chart.use(Z.OutboundAdjacency[LEFT], 0)
+	Z := chart.NextCell()
+	chart.Use(Z.OutboundAdjacency[LEFT], 0)
 
 	verify(t,
 		expect{c: V, rAdjOut: W},
@@ -282,30 +282,30 @@ func TestChart_CoveredAdjacencies(t *testing.T) {
 	chart := NewChart()
 	chart.AddTokens("W", "X", "Y", "Z")
 
-	W := chart.nextCell()
-	X := chart.nextCell()
-	chart.use(W.OutboundAdjacency[RIGHT], 0)
+	W := chart.NextCell()
+	X := chart.NextCell()
+	chart.Use(W.OutboundAdjacency[RIGHT], 0)
 
-	Y := chart.nextCell()
+	Y := chart.NextCell()
 	if a := X.OutboundAdjacency[RIGHT]; a.To != Y || a.CoveredByLink {
 		t.Error("expected non-covered adjacency X => Y ", a)
 	}
 
 	// Use of W => Y covers the X => Y adjacency. It isn't moved.
-	chart.use(W.OutboundAdjacency[RIGHT], 0)
+	chart.Use(W.OutboundAdjacency[RIGHT], 0)
 	if a := X.OutboundAdjacency[RIGHT]; a.To != Y || !a.CoveredByLink {
 		t.Error("expected covered adjacency X => Y ", a)
 	}
 
-	Z := chart.nextCell()
-	chart.use(Z.OutboundAdjacency[LEFT], 0)
+	Z := chart.NextCell()
+	chart.Use(Z.OutboundAdjacency[LEFT], 0)
 
 	if a := Y.OutboundAdjacency[LEFT]; a.To != X || a.CoveredByLink {
 		t.Error("expected non-covered adjacency Y => X", a)
 	}
 
 	// Use of Z => X covers the Y => X adjacency. It isn't moved.
-	chart.use(Z.OutboundAdjacency[LEFT], 0)
+	chart.Use(Z.OutboundAdjacency[LEFT], 0)
 	if a := Y.OutboundAdjacency[LEFT]; a.To != X || !a.CoveredByLink {
 		t.Error("expected non-covered adjacency Y => X", a)
 	}

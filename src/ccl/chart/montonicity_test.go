@@ -15,12 +15,12 @@ func TestMontonicity(t *testing.T) {
 	chart := NewChart()
 	chart.AddTokens("Y", "Z")
 
-	Y, Z := chart.nextCell(), chart.nextCell()
+	Y, Z := chart.NextCell(), chart.NextCell()
 	checkMontonicity(t, Y.OutboundAdjacency[RIGHT], RESTRICT_NONE)
 	checkMontonicity(t, Z.OutboundAdjacency[LEFT], RESTRICT_NONE)
 
-	chart.use(Y.OutboundAdjacency[RIGHT], 1)
-	chart.use(Z.OutboundAdjacency[LEFT], 1)
+	chart.Use(Y.OutboundAdjacency[RIGHT], 1)
+	chart.Use(Z.OutboundAdjacency[LEFT], 1)
 
 	// Outbound adjacencies created through linking have depth 0 blocked.
 	checkMontonicity(t, Y.OutboundAdjacency[RIGHT], RESTRICT_D0)
