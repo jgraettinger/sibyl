@@ -9,7 +9,7 @@ import (
 
 func Equal(thing1, thing2 interface{}, args ...interface{}) {
     if !reflect.DeepEqual(thing1, thing2) {
-        _, file, line, _ := runtime.Caller(2)
+        _, file, line, _ := runtime.Caller(1)
 
         errorString := fmt.Sprintf(
             "Invariant Violation:\n\t%v != %v\n\t<At %v:%v>",
@@ -20,7 +20,7 @@ func Equal(thing1, thing2 interface{}, args ...interface{}) {
 
 func NotEqual(thing1, thing2 interface{}, args ...interface{}) {
     if reflect.DeepEqual(thing1, thing2) {
-        _, file, line, _ := runtime.Caller(2)
+        _, file, line, _ := runtime.Caller(1)
 
         errorString := fmt.Sprintf(
             "Invariant Violation:\n\t%v == %v\n\t<At %v:%v>",
@@ -31,7 +31,7 @@ func NotEqual(thing1, thing2 interface{}, args ...interface{}) {
 
 func NotNil(thing interface{}, args ...interface{}) {
     if reflect.ValueOf(thing).IsNil() {
-        _, file, line, _ := runtime.Caller(2)
+        _, file, line, _ := runtime.Caller(1)
 
         errorString := fmt.Sprintf(
             "Invariant Violation:\n\t%v == nil\n\t<At %v:%v>",
@@ -42,7 +42,7 @@ func NotNil(thing interface{}, args ...interface{}) {
 
 func IsNil(thing interface{}, args ...interface{}) {
     if !reflect.ValueOf(thing).IsNil() {
-        _, file, line, _ := runtime.Caller(2)
+        _, file, line, _ := runtime.Caller(1)
 
         errorString := fmt.Sprintf(
             "Invariant Violation:\n\t%v != nil\n\t<At %v:%v>",
@@ -53,7 +53,7 @@ func IsNil(thing interface{}, args ...interface{}) {
 
 func IsTrue(result bool, args ...interface{}) {
     if !result {
-        _, file, line, _ := runtime.Caller(2)
+        _, file, line, _ := runtime.Caller(1)
 
         errorString := fmt.Sprintf(
             "Invariant Violation:\n\t<At %v:%v>", file, line)
@@ -63,7 +63,7 @@ func IsTrue(result bool, args ...interface{}) {
 
 func IsFalse(result bool, args ...interface{}) {
     if result {
-        _, file, line, _ := runtime.Caller(2)
+        _, file, line, _ := runtime.Caller(1)
 
         errorString := fmt.Sprintf(
             "Invariant Violation:\n\t<At %v:%v>", file, line)

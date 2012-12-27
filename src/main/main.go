@@ -3,14 +3,60 @@ package main
 import (
 	"bufio"
 	"ccl/chart"
+	"ccl/graphviz"
 	"ccl/lexicon"
 	"log"
+	"math/rand"
+	"net/http"
 	"os"
 	"strings"
 )
 
-func main() {
+type RandomScorer struct {
+	r *rand.Rand
+}
 
+func (s RandomScorer) Score(a *chart.Adjacency) (score float64, depth uint) {
+	if s.r.Intn(2) == 1 {
+		score = s.r.Float64()
+	}
+	depth = uint(s.r.Intn(2))
+	return
+}
+
+func parseRandom() {
+	scorer := RandomScorer{rand.New(rand.NewSource(32))}
+
+	for {
+		chart := chart.NewChart()
+		chart.AddTokens("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L")
+
+		defer func() {
+			if r := recover(); r != nil {
+				log.Print(r)
+
+				http.HandleFunc("/chart",
+					func(w http.ResponseWriter, r *http.Request) {
+						graphviz.RenderChartSvg(chart, w)
+					})
+				log.Fatal(http.ListenAndServe(":8080", nil))
+			}
+		}()
+
+		for chart.NextCell() != nil {
+			for {
+				adjacency, depth, score := chart.BestAdjacency(scorer)
+				if adjacency == nil {
+					break
+				}
+				log.Printf("Using %v@%d (%v)\n", adjacency, depth, score)
+				chart.Use(adjacency, depth)
+			}
+		}
+	}
+}
+
+func parsetext() {
 	lexicon := lexicon.New()
 
 	in := bufio.NewReader(os.Stdin)
@@ -32,6 +78,19 @@ func main() {
 
 		chart := chart.NewChart()
 		chart.AddTokens(tokens...)
+
+		defer func() {
+			if r := recover(); r != nil {
+				log.Print(r)
+
+				http.HandleFunc("/chart",
+					func(w http.ResponseWriter, r *http.Request) {
+						graphviz.RenderChartSvg(chart, w)
+					})
+				log.Fatal(http.ListenAndServe(":8080", nil))
+			}
+		}()
+
 		for chart.NextCell() != nil {
 			for {
 				adjacency, depth, score := chart.BestAdjacency(lexicon)
@@ -151,4 +210,8 @@ func main() {
 			}
 		}
 	*/
+}
+
+func main() {
+	parseRandom()
 }

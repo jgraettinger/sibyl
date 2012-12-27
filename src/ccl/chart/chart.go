@@ -237,8 +237,18 @@ func (chart *Chart) BestAdjacency(scorer Scorer) (
 	}
 
 	check := func(adjacency *Adjacency) {
+		if adjacency.To == nil {
+			return
+		}
 		restriction := adjacency.RestrictedDepths(chart)
 		score, depth := scorer.Score(adjacency)
+
+		// If we're in a violation, allow d=0 linking even if the scorer
+		// prefers d=1 linking. Otherwise, we could be unable to resolve
+		// the violation.
+		if chart.minimalViolation != nil {
+			depth = 0
+		}
 
 		log.Printf("Adjacency %s has score %v depth %v and restriction %v\n",
 			adjacency, score, depth, restriction)
