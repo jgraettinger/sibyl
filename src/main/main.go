@@ -6,60 +6,36 @@ import (
 	"ccl/graphviz"
 	"ccl/lexicon"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 )
 
-type RandomScorer struct {
-	r *rand.Rand
-}
+func parseSentence(req *http.Request,
+	w http.ResponseWriter, lexicon *Lexicon) {
 
-func (s RandomScorer) Score(a *chart.Adjacency) (score float64, depth uint) {
-	if s.r.Intn(2) == 1 {
-		score = s.r.Float64()
+	if err := req.ParseForm(); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
 	}
-	depth = uint(s.r.Intn(2))
-	return
-}
-
-func parseRandom() {
-	scorer := RandomScorer{rand.New(rand.NewSource(32))}
-
-	for {
-		chart := chart.NewChart()
-		chart.AddTokens("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L")
-
-		defer func() {
-			if r := recover(); r != nil {
-				log.Print(r)
-
-				http.HandleFunc("/chart",
-					func(w http.ResponseWriter, r *http.Request) {
-						graphviz.RenderChartSvg(chart, w)
-					})
-				log.Fatal(http.ListenAndServe(":8080", nil))
-			}
-		}()
-
-		for chart.NextCell() != nil {
-			for {
-				adjacency, depth, score := chart.BestAdjacency(scorer)
-				if adjacency == nil {
-					break
-				}
-				log.Printf("Using %v@%d (%v)\n", adjacency, depth, score)
-				chart.Use(adjacency, depth)
-			}
-		}
+	cht := chart.NewChart()
+	for _, field := range req.Form["token"] {
+		cht.AddTokens(chart.Token(field))
 	}
+
+	
+
 }
 
-func parsetext() {
-	lexicon := lexicon.New()
+func main() {
+	if len(os.Args) != 2 {
+		log.Fatalf("Usage: %v /path/to/lexicon.json", os.Args[1])
+	}
+	lexicon, err := lexicon.Open(os.Args[1])
+	if err != nil {
+		log.Panic(err)
+	}
 
-	in := bufio.NewReader(os.Stdin)
 	for {
 		line, err := in.ReadString('\n')
 		if err != nil {
@@ -212,6 +188,3 @@ func parsetext() {
 	*/
 }
 
-func main() {
-	parseRandom()
-}

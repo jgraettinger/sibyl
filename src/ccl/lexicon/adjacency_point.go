@@ -113,7 +113,7 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 	this.LabelWeights[directLabel] += 1
 
 	// lookup this adjacency's inverse
-	inverse := lexicon[AdjacencyPoint{token, -this.Sign()}]
+	inverse := lexicon.Db[AdjacencyPoint{token, -this.Sign()}]
 
 	if inverse != nil {
 		// for other labels of the inverse adjacency, add normalized weight
@@ -146,7 +146,7 @@ func (this *AdjacencyStatistics) update(lexicon Lexicon, token string) {
 			this.InRaw += -1
 		}
 	} else {
-		flippedInverse := lexicon[AdjacencyPoint{token, this.Sign()}]
+		flippedInverse := lexicon.Db[AdjacencyPoint{token, this.Sign()}]
 
 		if flippedInverse == nil || flippedInverse.HasLargeStop() {
 			this.InRaw += 1

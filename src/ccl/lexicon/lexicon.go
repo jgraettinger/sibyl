@@ -2,14 +2,38 @@ package lexicon
 
 import (
 	"ccl/chart"
+	"encoding/json"
 	"invariant"
+	"os"
 	"strings"
 )
 
-type Lexicon map[AdjacencyPoint]*AdjacencyStatistics
+type Lexicon struct {
+	Db map[AdjacencyPoint]*AdjacencyStatistics
+	File string
+}
 
-func New() Lexicon {
-	return make(Lexicon)
+func Open(file string) (*Lexicon, error) {
+	lexicon := &Lexicon{File: file}
+	lexicon.Db = make(map[AdjacencyPoint]*AdjacencyStatistics)
+
+	if fin, err := os.Open(file); os.IsNotExist(err) {
+		return lexicon, err
+	} else if err != nil {
+		return nil, err
+	} else if err = json.NewDecoder(fin).Decode(lexicon.Db); err != nil {
+		return nil, err
+	}
+	return lexicon, nil
+}
+
+func (lexicon *Lexicon) Save() error {
+	if fout, err := os.Create(lexicon.File); err != nil {
+		return err
+	} else if err = json.NewEncoder(fout).Encode(lexicon.Db); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (lexicon Lexicon) Score(adjacency *chart.Adjacency) (
@@ -20,7 +44,7 @@ func (lexicon Lexicon) Score(adjacency *chart.Adjacency) (
 		return
 	}
 
-	yIn := lexicon[AdjacencyPoint{string(adjacency.To.Token),
+	yIn := lexicon.Db[AdjacencyPoint{string(adjacency.To.Token),
 		-isign(adjacency.Position)}]
 	if yIn == nil {
 		return
@@ -30,7 +54,7 @@ func (lexicon Lexicon) Score(adjacency *chart.Adjacency) (
 	//  position and working backwards to position 1
 	position := adjacency.Position
 	for ; linkWeight == 0 && position != 0; position -= isign(position) {
-		xOut := lexicon[AdjacencyPoint{string(adjacency.From.Token), position}]
+		xOut := lexicon.Db[AdjacencyPoint{string(adjacency.From.Token), position}]
 		if xOut == nil {
 			continue
 		}
@@ -57,10 +81,10 @@ func (lexicon Lexicon) linkWeight(xOut, yIn *AdjacencyStatistics) (
 	var prototype *AdjacencyStatistics
 	if label.IsClass() {
 		// label prototypes x along with tokens separating x from y
-		prototype = lexicon[AdjacencyPoint{label.Token, xOut.Sign()}]
+		prototype = lexicon.Db[AdjacencyPoint{label.Token, xOut.Sign()}]
 	} else {
 		// label prototypes y in it's relationship with x
-		prototype = lexicon[AdjacencyPoint{label.Token, -xOut.Sign()}]
+		prototype = lexicon.Db[AdjacencyPoint{label.Token, -xOut.Sign()}]
 	}
 
 	if prototype == nil {
@@ -139,8 +163,8 @@ func (lexicon Lexicon) Learn(ch *chart.Chart) {
 	}
 	// Fold each delta into the lexicon.
 	for _, delta := range deltas {
-		if stats, found := lexicon[delta.AdjacencyPoint]; !found {
-			lexicon[delta.AdjacencyPoint] = delta
+		if stats, found := lexicon.Db[delta.AdjacencyPoint]; !found {
+			lexicon.Db[delta.AdjacencyPoint] = delta
 		} else {
 			stats.fold(delta)
 		}
@@ -149,7 +173,7 @@ func (lexicon Lexicon) Learn(ch *chart.Chart) {
 
 func (this Lexicon) String() string {
 	var parts []string
-	for _, adjacency := range this {
+	for _, adjacency := range this.Db {
 		parts = append(parts, adjacency.String())
 	}
 	return strings.Join(parts, "\n")
