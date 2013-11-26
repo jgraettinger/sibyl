@@ -2,7 +2,8 @@ package chart
 
 import (
 	"fmt"
-	"invariant"
+
+	"github.com/dademurphy/sibyl/invariant"
 )
 
 type DepthRestriction int

@@ -1,8 +1,9 @@
 package chart
 
 import (
-	"invariant"
 	"log"
+
+	"github.com/dademurphy/sibyl/invariant"
 )
 
 func updateResolution(chart *Chart, link *Link) {

@@ -1,7 +1,7 @@
 package chart
 
 import (
-	"invariant"
+	"github.com/dademurphy/sibyl/invariant"
 )
 
 type Direction bool

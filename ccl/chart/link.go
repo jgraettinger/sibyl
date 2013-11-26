@@ -1,8 +1,8 @@
 package chart
 
 import (
-	. "ccl/util"
-	"invariant"
+	. "github.com/dademurphy/sibyl/ccl/util"
+	"github.com/dademurphy/sibyl/invariant"
 )
 
 type Link struct {

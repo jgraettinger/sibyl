@@ -1,7 +1,7 @@
 package ccl
 
 import (
-    "invariant"
+    "github.com/dademurphy/sibyl/invariant"
 )
 
 func Fmin(a, b float64) float64 {
