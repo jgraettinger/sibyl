@@ -1,4 +1,4 @@
-package chart
+package parser
 
 type Chart struct {
 	input TokenStream

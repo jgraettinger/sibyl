@@ -1,4 +1,4 @@
-package chart
+package parser
 
 // Sugar for internal consistency tests, which looks slightly
 // nicer than if (!condition) { panic(...) }

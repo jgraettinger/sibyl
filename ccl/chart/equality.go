@@ -2,42 +2,45 @@ package chart
 
 import (
 	"log"
-
-	"github.com/dademurphy/sibyl/invariant"
 )
 
 func (adjacency *Adjacency) EqualityRestriction() (restrict DepthRestriction) {
-	forward := DirectionFromPosition(adjacency.Position)
-	backward := forward.Flip()
-
 	if adjacency.To == nil {
 		return
 	}
+	forward := DirectionFromPosition(adjacency.Position)
 
-	// Is there a link-path back to head from tail? The depth of the first
-	// link on that path constrains the allowable depth of the adjacency.
-	if adjacency.To.D0LinkPathReaches(adjacency.From) {
+	// Look for a link-path back to the head from tail. The depth of the
+	// first link on that path constrains the allowable depth of the adjacency.
+	if backReach := adjacency.TailSide().FurthestD0Path(); !forward.Less(
+		adjacency.Head.Index, backReach) {
 		log.Print("A d=0 path back-to-head exists")
 		restrict = RESTRICT_D1
-	} else if adjacency.To.D1LinkPathReaches(adjacency.From) {
+	} else if backReach = adjacency.TailSide().FurthestPath(); !forward.Less(
+		adjacency.Head.Index, backReach) {
 		log.Print("A d=1 path back-to-head exists")
-		restrict = RESTRICT_D0
+		restrict = RESTRICT_D1
 	}
 
-	// Is there a cell Z, such that Z directly links to head and this
-	// adjacency would be the first link on a completed path reaching Z?
-	// If so, the Z => head link constrains the depth of this adjacency.
-	if backLink := backward.InboundLink(adjacency.From); backLink != nil &&
-		forward.Less(adjacency.To.Index, backLink.From.Index) &&
-		adjacency.To.LinkPathReaches(backLink.From) {
+	// Is there a cell Z such that Z is beyond the adjacency tail in the
+	// forward direction, and where Z also links directly back to head?
+	// If so, is there a forward link path from the tail to Z, such that
+	// this adjacency would form the first link on a completed path
+	// to Z from the head? If so, the Z => head back-link then constrains
+	// the depth of this adjacency.
+	if backLink := adjacency.Head.InboundLink; backLink != nil &&
+		forward.Less(adjacency.Tail.Index, backLink.Head.Index) {
 
-		log.Printf("Eq-restricting link is %v", backLink)
+		if reach := forward.HeadSide(adjacency.Tail).FurthestPath(); !forward.Less(
+			reach, backLink.Head) {
 
-		// If adjacency.To has a link-path to backLink.From, than the partial
-		// blocking restriction constrains backLink to d=1.
-		invariant.IsTrue(backLink.Depth == 1)
-		restrict = RESTRICT_D0
+			log.Printf("Eq-restricting link is %v", backLink)
+			// If tail has a link-path to Z, then the partial blocking
+			// restruction must have constrained backLink to d=1.
+			invariant(backLink.Depth == 1)
+			restrict = RESTRICT_D0
+		}
 	}
-	invariant.IsFalse(restrict == RESTRICT_ALL)
+	invariant(restrict != RESTRICT_ALL)
 	return
 }

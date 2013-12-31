@@ -121,3 +121,4 @@ func TestFullBlockingProjectedBackwardLink(t *testing.T) {
 	checkBlocking(t, V.OutboundAdjacency[RIGHT], RESTRICT_ALL)
 	checkBlocking(t, Z.OutboundAdjacency[LEFT], RESTRICT_ALL)
 }
+

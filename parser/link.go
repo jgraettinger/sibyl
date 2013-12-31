@@ -1,4 +1,4 @@
-package chart
+package parser
 
 type Link struct {
 	// Never nil
@@ -83,4 +83,16 @@ func updateBoxedPathRightToLeft(link *Link) {
 		link.BoxedFurthestPath = new(*Cell)
 		*link.BoxedFurthestPath = link.Tail
 	}
+}
+func (l *Link) HeadSide() *CellSide {
+	if l.Position < 0 {
+		return &l.Head.Left
+	}
+	return &l.Head.Right
+}
+func (l *Adjacency) TailSide() *CellSide {
+	if l.Position < 0 {
+		return &l.Tail.Right
+	}
+	return &l.Tail.Left
 }

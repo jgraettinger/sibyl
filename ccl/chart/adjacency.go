@@ -16,8 +16,9 @@ const (
 )
 
 type Adjacency struct {
-	From *Cell
-	To   *Cell // inclusive; may be nil
+	// Head is always non-nil, but tail may be nil to represent
+	// an adjacency beyond the sentence extents.
+	Head, Tail *Cell
 
 	// The argument attachment position this adjacency reflects
 	Position int
@@ -25,8 +26,23 @@ type Adjacency struct {
 	SpansPunctuation bool
 
 	// Denotes this adjacency is 'covered' by a link spanning
-	// From & To. Covered adjacencies cannot be used (see 3.2.2).
+	// Head & Tail. Covered adjacencies cannot be used (see 3.2.2).
 	CoveredByLink bool
+}
+
+func (adjacency *Adjacency) HeadSide() *Side {
+	if adjacency.Position < 0 {
+		return &adjacency.Head.Left
+	} else {
+		return &adjacency.Head.Right
+	}
+}
+func (adjacency *Adjacency) TailSide() *Side {
+	if adjacency.Position < 0 {
+		return &adjacency.Tail.Right
+	} else {
+		return &adjacency.Tail.Left
+	}
 }
 
 func (adjacency *Adjacency) RestrictedDepths(chart *Chart) (
@@ -93,8 +109,8 @@ func (adjacency *Adjacency) String() string {
 	if r := adjacency.EqualityRestriction(); r != RESTRICT_NONE {
 		properties += fmt.Sprintf(", (eq %v)", r)
 	}
-	return fmt.Sprintf("Adjacency<%v:%d => %v%v>", adjacency.From,
-		adjacency.Position, adjacency.To, properties)
+	return fmt.Sprintf("Adjacency<%v:%d => %v%v>", adjacency.Head,
+		adjacency.Position, adjacency.Tail, properties)
 }
 
 func (restrict DepthRestriction) String() string {

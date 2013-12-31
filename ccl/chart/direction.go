@@ -1,9 +1,5 @@
 package chart
 
-import (
-	"github.com/dademurphy/sibyl/invariant"
-)
-
 type Direction bool
 
 const (
@@ -14,34 +10,39 @@ const (
 func DirectionFromPosition(position int) Direction {
 	if position < 0 {
 		return RIGHT_TO_LEFT
+	} else {
+		return LEFT_TO_RIGHT
 	}
-	return LEFT_TO_RIGHT
 }
 
-func (dir Direction) Flip() Direction {
-	return !dir
-}
-
-func (dir Direction) SideOut() int {
+func (dir Direction) Less(index1, index2 int) bool {
 	if dir == LEFT_TO_RIGHT {
-		return RIGHT
+		return index1 < index2
+	} else {
+		return index1 > index2
 	}
-	return LEFT
-}
-func (dir Direction) SideIn() int {
-	if dir == LEFT_TO_RIGHT {
-		return LEFT
-	}
-	return RIGHT
 }
 
 func (dir Direction) String() string {
 	if dir == LEFT_TO_RIGHT {
 		return "LEFT_TO_RIGHT"
+	} else {
+		return "RIGHT_TO_LEFT"
 	}
-	return "RIGHT_TO_LEFT"
 }
 
+func (dir Direction) HeadSide(cell *Cell) *Side {
+	if dir == LEFT_TO_RIGHT {
+		return &cell.Right
+	} else {
+		return &cell.Left
+	}
+}
+
+/*
+func (dir Direction) Flip() Direction {
+	return !dir
+}
 func (dir Direction) PositionSign() int {
 	if dir == LEFT_TO_RIGHT {
 		return 1
@@ -49,7 +50,7 @@ func (dir Direction) PositionSign() int {
 	return -1
 }
 
-/*
+
 // Returns index of first token in this direction
 func (dir Direction) BeginIndex(chart *Chart) int {
 	if dir == LEFT_TO_RIGHT {
@@ -72,7 +73,6 @@ func (dir Direction) AtEnd(index int, chart *Chart) bool {
 	}
 	return index == -1
 }
-*/
 
 func (dir Direction) Increment(index int) int {
 	if dir == LEFT_TO_RIGHT {
@@ -86,13 +86,6 @@ func (dir Direction) Decrement(index int) int {
 		return index - 1
 	}
 	return index + 1
-}
-
-func (dir Direction) Less(index1, index2 int) bool {
-	if dir == LEFT_TO_RIGHT {
-		return index1 < index2
-	}
-	return index1 > index2
 }
 
 func (dir Direction) OutboundAdjacency(cell *Cell) *Adjacency {
@@ -217,7 +210,7 @@ func (dir Direction) SetPathEndD1(cell *Cell, index int) {
 func (dir Direction) PathEnd(cell *Cell) int {
     return dir.Largest(dir.PathEndD0(cell), dir.PathEndD1(cell))
 }
-*/
+
 
 func (dir Direction) Largest(a, b int) int {
 	if dir == LEFT_TO_RIGHT {
